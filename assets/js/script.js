@@ -78,17 +78,17 @@ sprites.src = "assets/images/mySprites2.png";
 //walkable indicates if the object is walkable (ie: can the player move across it)
 //damaging indicates if the object damages the player when touched.
 var tileObjects =  [
-	{"rep":".", "name":"floor", "spritex":64, "spritey" :16, "spriteSize":16, "walkable":true, "damaging":false},
-	{"rep":"_", "name":"floor2", "spritex":80, "spritey" :16, "spriteSize":16, "walkable":true, "damaging":false},
-	{"rep":"1", "name":"wall", "spritex":0, "spritey" :16, "spriteSize":16, "walkable":false, "damaging":false},
-	{"rep":"2", "name":"fount", "spritex":16, "spritey" :16, "spriteSize":16, "walkable":false, "damaging":false},
-	{"rep":"3", "name":"wall2", "spritex":32, "spritey" :16, "spriteSize":16, "walkable":false, "damaging":false},
-	{"rep":"4", "name":"tree", "spritex":48, "spritey" :16, "spriteSize":16, "walkable":false, "damaging":false},
+	{"rep":".", "name":"floor", "spritex":64, "spritey" :16, "spriteSize":16, "solid":false, "damaging":false, "visible": false},
+	{"rep":"_", "name":"floor2", "spritex":80, "spritey" :16, "spriteSize":16, "solid":false, "damaging":false, "visible": false},
+	{"rep":"1", "name":"wall", "spritex":0, "spritey" :16, "spriteSize":16, "solid":true, "damaging":false, "visible": false},
+	{"rep":"2", "name":"fount", "spritex":16, "spritey" :16, "spriteSize":16, "solid":true, "damaging":false, "visible": false},
+	{"rep":"3", "name":"wall2", "spritex":32, "spritey" :16, "spriteSize":16, "solid":true, "damaging":false, "visible": false},
+	{"rep":"4", "name":"tree", "spritex":48, "spritey" :16, "spriteSize":16, "solid":true, "damaging":false, "visible": false},
 ];
 
 //this array holds information about all the interactible entities.
 var entities = [
-	{name: "player", x: 250, y: 250, xVec: 0, yVec: 0, spriteX: 0, spriteY: 0, spriteSize: 16}
+	{name: "player", x: 250, y: 250, xVec: 0, yVec: 0, spriteX: 0, spriteY: 0, spriteSize: 16, solid: true}
 ];
 //IDEALLY everything above this line would be in a different file, and would instead be imported and used. but i was having trouble with cross domain issues, so it's here for now...
 //=====================================================================================================================================================
@@ -109,7 +109,7 @@ var grid = girdInit(16,50,50,'#0b175b',"#2b43c6");
 //our game loop is below.
 //this calls loop every 17 miliseconds (about 60fps).
 //loop takes care of the game logic, and also re-renders the screen.
-var gameLoopInterval = setInterval(loop, 17, grid, context1, entities);
+var gameLoopInterval = setInterval(loop, 30, grid, context1, entities);
 
 //====================================================PLAYER INPUT HERE=======================================================
 var keysPressed = []; //this is the global array that holds all the keys that are pressed inbetween each frame.
@@ -138,7 +138,7 @@ $("body").keydown(function(e){
 //------------this captures all the keyup events-------------------
 $("body").keyup(function(e){
 	keysPressed[e.which] = false;
-	keyupHandler(entities, keysPressed);
+	//keyupHandler(entities, keysPressed);
 });
 
 //------------------------THESE FUNCTIONS DO STUFF WITH THE CAPTURED EVENTS------------------------
@@ -155,19 +155,17 @@ function mouseMoveHandler(entities, mousex, mousey){
 
 function mouseClickHandler(entities, mousex, mousey){
 	//this is where we put whatever code we want to run when the mouse is clicked.
+	
 	var foundCell = findCellAt(grid, mousex, mousey);
 	//shoot a ray from the position of the player to the mouse.
 	var hitcoords = castRay(grid, context1, entities[0].x, entities[0].y, mousex, mousey);
 	var hitcell = findCellAt(grid,hitcoords.x, hitcoords.y);
 	console.log(hitcell.object);
+
 }//end mouseclickhandler
 
 //we run this function every time a key is pressed
 function keydownHandler(entities, keysPressed){
-//if one of the player movement keys is pressed, call the function that adjusts the velocity.
-	if(keysPressed[65] || keysPressed[68] || keysPressed[83] || keysPressed[87]){
-		adjustPlayerVelocity(entities, keysPressed);
-	}
 
 }//end keydownhandler
 
@@ -178,34 +176,181 @@ function keyupHandler(entities, keysPressed){
 
 //==============================================END PLAYER INPUT=============================================================
 
-function adjustPlayerVelocity(entities, keysPressed){
-	//this function adjusts the character's velocity depending on which key is pressed
-		var velocity = 2;
-		var max = 5;
+//this just function takes an entity and changes its x and y location by its x and y velocity 
+function moveEntityByVelocity(entity){
+	//move the character by their vector magnitudes
+	entity.x += entity.xVec;
+	entity.y += entity.yVec;
+}//end moveEntityByVelocity
+
+//this function runs every frame and takes an entity and reduces its x and y velocity by a the entered 'friction' to mimic friction 
+function applyFrictionToVelocity(entity, friction){
+	//friction is the friction to apply every frame. 
+	//these 4 lines normalize the x and y vectors of the character a bit each frame until theyre both close to 0
+	if(entity.yVec > 0){entity.yVec -= friction;}
+	if(entity.yVec < 0){entity.yVec += friction;}
+	if(entity.xVec > 0){entity.xVec -= friction;}
+	if(entity.xVec < 0){entity.xVec += friction;}
+	//these two lines catch a case where a very small friction can cause a permanent velocity because the previous 4 lines vassilate over the 0 threshold
+	if(entity.xVec > 0 && entity.xVec <= friction){entity.xVec = 0;}
+	if(entity.yVec > 0 && entity.yVec <= friction){entity.yVec = 0;}
+}//end applyFrictionToVelocity
+
+function adjustVelocityOnKeypress(entity, keysPressed, delta, max){
+	//this function adjusts an entity's velocity depending on which key is pressed
+	//max is the maximum speed, 
+	//delta is... essentially acceleration. 
+	//if the movement keys are pressed...
+	if(keysPressed[65] || keysPressed[68] || keysPressed[83] || keysPressed[87]){
 		facePlayerToCursor(entities, mousePos.x, mousePos.y);
-		if(Math.abs(entities[0].xVec) <= max){//so long as the xvelocity isnt greater than the allowed max
+		if(Math.abs(entity.xVec) <= max){//so long as the xvelocity isnt greater than the allowed max
 			if(keysPressed[65]){//A pressed
-				if(entities[0].xVec > 0){entities[0].xVec = 0;} //this zeros out the velocity, so there isnt a pause when quickly changing directions.
-				entities[0].xVec -= velocity;
+				entity.xVec -= delta;
 			}
-			if(keysPressed[68]){//w pressed
-				if(entities[0].xVec < 0){entities[0].xVec = 0;}
-				entities[0].xVec += velocity;
+			if(keysPressed[68]){//d pressed
+				entity.xVec += delta;
 			}
 		}
-		if(Math.abs(entities[0].yVec) <= max){//so long as the y velocity isnt greater than the allowed max
+		if(Math.abs(entity.yVec) <= max){//so long as the y velocity isnt greater than the allowed max
 			if(keysPressed[83]){//s pressed
-				if(entities[0].yVec < 0){entities[0].yVec = 0;}
-				entities[0].yVec += velocity;
+				entity.yVec += delta;
 			}
-			if(keysPressed[87]){//d pressed
-				if(entities[0].yVec > 0){entities[0].yVec = 0};
-				entities[0].yVec -= velocity;
+			if(keysPressed[87]){//w pressed
+				entity.yVec -= delta;
 			}
 		}
+	}
+	
 }//end adjustPlayerVelocity
 
-//this function takes a 2d level array and an object list to assign the correct object to each cell based on the 2d level array
+//this function finds the cells at the 4 corners of a particular entity,
+//then it figures out if those cells are collidable, and if so, changes the entity's velcity by the bounce arg
+//such that the entity wont intersect with the cell/object
+function findCollisionsThenAdjustVelocity(entity, grid, bounce){
+	//find the cells at 4 corners of the player's sprite and check them for collisions.
+	var fourCornersCollisions = findCollisionsOnFourCorners(entity,grid);
+	
+	//adjust velocity based on which of the 4 corners has collided with something
+	if(fourCornersCollisions.nwCell || fourCornersCollisions.neCell || fourCornersCollisions.swCell || fourCornersCollisions.seCell){
+		//-----------------------THREE CORNER COLLISION ADJUSTMENTS---------------------------
+		//if 3 of the 4 corners are currently colliding in the top left, push them away HARD!!!
+		if(!fourCornersCollisions.seCell && fourCornersCollisions.nwCell && fourCornersCollisions.neCell && fourCornersCollisions.swCell){
+			entity.yVec = 2*bounce;
+			entity.xVec = 2*bounce;
+		}
+		//if 3 of the 4 corners are currently colliding in the top right, push them away HARD!!!
+		else if(fourCornersCollisions.seCell && fourCornersCollisions.nwCell && fourCornersCollisions.neCell && !fourCornersCollisions.swCell){
+			entity.yVec = 2*bounce;
+			entity.xVec = -2*bounce;
+		}
+		//if 3 of the 4 corners are currently colliding in the bottom right, push them away HARD!!!
+		else if(fourCornersCollisions.seCell && !fourCornersCollisions.nwCell && fourCornersCollisions.neCell && fourCornersCollisions.swCell){
+			entity.yVec = -2*bounce;
+			entity.xVec = -2*bounce;
+		}	
+		//if 3 of the 4 corners are currently colliding in the bottom left, push them away HARD!!!
+		else if(fourCornersCollisions.seCell && fourCornersCollisions.nwCell && !fourCornersCollisions.neCell && fourCornersCollisions.swCell){
+			entity.yVec = -2*bounce;
+			entity.xVec = 2*bounce;
+		}
+		//----------------------------TWO CORNER COLLISION ADJUSTMENTS----------------------------------
+		//if both top corners are colliding, negate upward velocity
+		else if(fourCornersCollisions.nwCell && fourCornersCollisions.neCell && !fourCornersCollisions.swCell && !fourCornersCollisions.seCell){
+			entity.yVec = bounce;
+		}
+		//if both right corners are colliding, negate rightward velocity
+		else if(fourCornersCollisions.neCell && fourCornersCollisions.seCell && !fourCornersCollisions.nwCell && !fourCornersCollisions.swCell){
+			entity.xVec =  -1*bounce;
+		}
+		//if both bottom corners are colliding, negate downward velocity
+		else if(fourCornersCollisions.seCell && fourCornersCollisions.swCell && !fourCornersCollisions.nwCell && !fourCornersCollisions.neCell){
+			entity.yVec = -1*bounce;
+		}
+		//if both left corners are colliding, negate leftward velocity
+		else if(fourCornersCollisions.swCell && fourCornersCollisions.nwCell && !fourCornersCollisions.seCell && !fourCornersCollisions.neCell){
+			entity.xVec = bounce;
+		}
+		//-------------------------------------ONE CORNER COLLISION ADJUSTMENTS---------------------------------------
+		//if ONLY the NE corner is colliding, negate leftward AND upward velocities
+		else if(fourCornersCollisions.neCell && !fourCornersCollisions.nwCell && !fourCornersCollisions.swCell && !fourCornersCollisions.seCell){
+			entity.xVec = -1*bounce;
+			entity.yVec = bounce;
+		}
+		//if ONLY the NW corner is colliding, negate rightward AND upward velocities
+		else if(fourCornersCollisions.nwCell && !fourCornersCollisions.neCell && !fourCornersCollisions.swCell && !fourCornersCollisions.seCell){
+			entity.xVec = bounce;
+			entity.yVec = bounce;
+		}
+		//if ONLY the SW corner is colliding, negate leftward AND downward velocities
+		else if(fourCornersCollisions.swCell && !fourCornersCollisions.nwCell && !fourCornersCollisions.neCell && !fourCornersCollisions.seCell){
+			entity.xVec = bounce;
+			entity.yVec = -1*bounce;
+		}
+		//if ONLY the SE corner is colliding, negate rightward AND downward velocities
+		else if(fourCornersCollisions.seCell && !fourCornersCollisions.nwCell && !fourCornersCollisions.neCell && !fourCornersCollisions.swCell){
+			entity.xVec = -1*bounce;
+			entity.yVec = -1*bounce;
+		}
+	}
+}//end adjustEntityVelocityWithCollisions
+
+//this function is used to figure out which of the tile objects on the grid are visible from the an entity's position. 
+function markObjectsVisibleToEntity(grid, entity){
+	for(var i=0; i<grid.length; i++)
+	{
+		for(var f=0; f<grid[i].length; f++)
+		{
+			//does this cell even have an object in it to show?
+			if(typeof(grid[i][f].object) == "object"){
+				//cast a ray from the player toward this object, and get the location where it intersects -something-
+				var endLoc = castRay(grid, entity.x, entity.y, grid[i][f].centerX, grid[i][f].centerY);
+				//find the cell at the intersection location
+				var cell = findCellAt(grid, endLoc.x, endLoc.y);
+				//if the cell at the intersection location is this very same cell, mark it as visible
+				//(since an unbroken line from the player to it is possible).
+				if(grid[i][f] == cell){
+					grid[i][f].object.visible = true;
+				}
+				else{
+					grid[i][f].object.visible = false;
+				}
+			}
+		}
+	}
+	/* //it works like this: it shoots 360 rays, evenly spaced, out from the player. any objects that are hit by a ray are marked as visible=true
+	for(var a = 0; a<360; a++){
+		//first we need to find a point on a circle around the player that is very large, so that we can cast a ray that goes across the whole game space.
+		var radius = 1000;
+		var rads = a*0.1745329252 //this converts the angle A into a radian value (I found the conversion constant online somewhere)
+		var x = entity.x+(radius*Math.sin(rads)); //this uses the radius, player's x position, and the radian angle to find the x of the end point
+	} */
+}
+
+//this function finds the cells at the 4 corners of an entity and returns an object of trues and falses, showing if the entity collides with them
+//this basically works as AABB collision detection between an entity and static grid objects.
+function findCollisionsOnFourCorners(entity, grid){
+	//initialize the return object as all false
+	var returnObj = {neCell: false, nwCell: false, seCell: false, swCell: false};
+	if(entity.solid){//make sure the entity is solid first...
+		var halfSize = Math.floor(entity.spriteSize/2);
+		
+		//find the cells we need to check
+		var nwCell = findCellAt(grid, entity.x-halfSize, entity.y-halfSize);
+		var neCell = findCellAt(grid, entity.x+halfSize, entity.y-halfSize);
+		var swCell = findCellAt(grid, entity.x-halfSize, entity.y+halfSize);
+		var seCell = findCellAt(grid, entity.x+halfSize, entity.y+halfSize);
+		
+		//check the cells for solid-ness and alter return object accordingly
+		if(nwCell && nwCell.object.solid){returnObj.nwCell = true;}
+		if(neCell && neCell.object.solid){returnObj.neCell = true;}
+		if(swCell && swCell.object.solid){returnObj.swCell = true;}
+		if(seCell && seCell.object.solid){returnObj.seCell = true;}
+		//return the object of cells
+	}
+	return returnObj;
+}
+
+//this function takes a 2d level array and an object list to assign the correct object to each cell in the grid based on the 2d level array
 function assignLevelToGrid(grid, level, objs){
 	//for each index in the 2d level array...
 	for(var j = 0; j<level.length; j++){
@@ -221,7 +366,7 @@ function assignLevelToGrid(grid, level, objs){
 						}
 					}//end object search for loop
 					if(cellObject){//if an object was found that matches the 2d level array's representation, assign that object to this cell
-						grid[k][j].object = cellObject;
+						grid[k][j].object = Object.assign({}, cellObject);//object.assign makes a DEEP copy/copy by value of the object.
 					}
 					else{//otherwise, just assign the level array's represenation to the cell.
 						grid[k][j].object = level[l][k];
@@ -231,7 +376,28 @@ function assignLevelToGrid(grid, level, objs){
 	}//end assignment (j) loop
 };
 
-function castRay(grid, canvas, startx, starty, linex, liney){
+
+//this function checks collision between an entity and a cell, returns a true or false if the entity is colliding with the cell
+function CheckAABBCollision(entity, cell){
+	//first make sure both the cell and the entity should be colliding at all. 
+	var collide = false;
+	if(cell.object.solid && entity.solid){
+		if(//then check their 'Axis Aligned Bounding Box' collision. 
+			entity.x < cell.x + cell.object.spriteSize &&
+			entity.x + entity.spriteSize > cell.x &&
+			entity.y < cell.y + cell.object.spriteSize &&
+			entity.y + entity.spriteSize > cell.y
+		  ){
+			//it collides
+			console.log("COLLISION:");
+			console.log(cell);
+			collide = true;
+		}
+	}
+	return collide;	
+}
+
+function castRay(grid, startx, starty, linex, liney){
 	//y=mx+b
 	var slope = (linex-startx)/(liney-starty);
 	var b = -1*((slope*(linex))-liney);
@@ -248,20 +414,12 @@ function castRay(grid, canvas, startx, starty, linex, liney){
 		var newy = starty + (liney - starty) * f;
 		//here we check if that point is in an unwalkable tile.
 		var foundCell = findCellAt(grid, newx, newy);
-		if(!foundCell.object.walkable){
+		if(foundCell.object.solid){
 			liney=newy;
 			linex=newx;
 			f=1;
 		}
 	}
-
-	//this draws the ray for us. can get rid of if we want.
-	canvas.strokeStyle = "yellow";
-	canvas.beginPath();
-	canvas.moveTo(startx, starty);
-	canvas.lineTo(linex,liney);
-	canvas.stroke();
-	canvas.closePath();
 
 	//return the collision point OR the origional clicked point.
 	return ({x:linex,y:liney});
@@ -351,23 +509,35 @@ function girdInit(size, cellsX, cellsY, fillColor, edgeColor)
 function loop(grid, canvas, entities){
 	//-------------------------------------THIS IS WHERE THE GAME LOGIC WOULD GO------------------------------------------
 
-	//move the character by their vector magnitudes
-	entities[0].x += entities[0].xVec;
-	entities[0].y += entities[0].yVec;
+	//adjust velocity is called here to make sure we properly accelerate the entity/player EVERY frame. this avoids weird halting behavior when changing direction.
+	var delta = 3; //working value: 1dwsawd
+	var max = 9;// working value: 3
+	adjustVelocityOnKeypress(entities[0], keysPressed, delta, max);
+	
+	//find where/if the entity/player is colliding with env objects and adjust the velocity to keep him from going through stuff
+	var bounce = 3; //working value: 1
+	findCollisionsThenAdjustVelocity(entities[0], grid, bounce);
 
-	var slowSpeed = .5;
-	//these 4 lines normalize the vector movement of the character a bit each frame until theyre both 0
-	if(entities[0].yVec > 0){entities[0].yVec -= slowSpeed;}
-	if(entities[0].yVec < 0){entities[0].yVec += slowSpeed;}
-	if(entities[0].xVec > 0){entities[0].xVec -= slowSpeed;}
-	if(entities[0].xVec < 0){entities[0].xVec += slowSpeed;}
-
-
+	//this function applies a small reduction to the x and y velocities of an entity to mimic friction. its how entities stop moving.
+	var friction = 1;//working value: .3
+	applyFrictionToVelocity(entities[0], friction);
+	
+	//this function (FINALLY) actually changes the x and y location of an entity by its x and y velocity
+	moveEntityByVelocity(entities[0]);
+	
+	
+	
 	//----------------------------------------------end the game logic----------------------------------------------------
 
 
 	//define the object that describes what we want to render:
-	var renderThese = {grid: false, objects: true, entities: true};
+	var renderThese = {grid: true, objects: true, entities: true, visibleOnly: true};
+	
+	if(renderThese.visibleOnly){
+		//this shoots A BUNCH of rays. no need to do it if we'll see everything anyway.
+		markObjectsVisibleToEntity(grid, entities[0]);
+	}
+	
 	//finally, at the end we render all graphics
 	render(renderThese, grid, canvas, entities);
 }
@@ -388,7 +558,7 @@ function render(renderThese, grid, canvas, entities){
 	}
 	//if objects is true in renderThese object, draw the objects
 	if(renderThese.objects){
-		drawObjects(grid, canvas);
+		drawObjects(grid, canvas, renderThese.visibleOnly);
 	}
 
 	if(renderThese.entities){
@@ -477,7 +647,7 @@ function drawGrid(canvas, grid, drawWalls)
 
 }//end drawGrid
 
-function drawObjects(grid, canvas){
+function drawObjects(grid, canvas, visibleOnly){
 
 	 for(var i=0; i<grid.length; i++)
 	{
@@ -487,11 +657,29 @@ function drawObjects(grid, canvas){
 				 //if the object is a proper game object with a sprite, draw the sprite
 				 if(typeof(grid[i][f].object) == "object"){
 					 //drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
-					 canvas.drawImage(sprites, grid[i][f].object.spritex, grid[i][f].object.spritey, grid[i][f].object.spriteSize, grid[i][f].object.spriteSize, grid[i][f].x, grid[i][f].y, grid[i][f].w, grid[i][f].h);
+					 if(visibleOnly){
+						if(grid[i][f].object.visible){
+							canvas.drawImage(sprites, grid[i][f].object.spritex, grid[i][f].object.spritey, grid[i][f].object.spriteSize, grid[i][f].object.spriteSize, grid[i][f].x, grid[i][f].y, grid[i][f].w, grid[i][f].h);
+						}
+						else {
+							canvas.fillStyle = "#555";
+							canvas.fillRect(grid[i][f].x, grid[i][f].y, grid[i][f].w, grid[i][f].h);
+							//draw the image ANYWAY, just draw it at a very low transparency, so its hard to see.
+							//this keeps the game from having huge ugly swaths of solid 'shadow'							
+							canvas.globalAlpha = 0.04;
+							canvas.drawImage(sprites, grid[i][f].object.spritex, grid[i][f].object.spritey, grid[i][f].object.spriteSize, grid[i][f].object.spriteSize, grid[i][f].x, grid[i][f].y, grid[i][f].w, grid[i][f].h);
+							canvas.globalAlpha = 1;
+							
+						}
+					 }//end visible only check
+					 else {
+						 canvas.drawImage(sprites, grid[i][f].object.spritex, grid[i][f].object.spritey, grid[i][f].object.spriteSize, grid[i][f].object.spriteSize, grid[i][f].x, grid[i][f].y, grid[i][f].w, grid[i][f].h);
+					 }
 				 }
 				 else{//if the object is not a proper game object, just draw the text of whatever is in there
 					console.log('non-game object object found');
-					canvas.fillStyle = "white";
+					canvas.fillStyle = "#aaa";
+					canvas.fillRect(grid[i][f].x, grid[i][f].y, grid[i][f].w, grid[i][f].h);
 					//this sets the font to arial and the size to 70% of the average of the height and width.
 					canvas.font = parseInt((((grid[i][f].h+grid[i][f].w)/2)*.7),10)+"px Arial";
 					//this writes the text of the object at the 20% more than cell's x and y locations (ie: toward the center of the cell).
@@ -521,8 +709,8 @@ function Cell(x, y, h, w, indexX, indexY, fillColor, edgeColor)
   this.y = y; //this is the y pixel location of the top left corner of this cell on the canvas object
   this.h = h; //how tall the cell is
   this.w = w; // how wide the cell is
-  this.centerX = this.x+parseInt((this.w/2),10); //the horizontal center of this cell
-  this.centerY = this.y-parseInt((this.h/2),10); //the vertical center of this cell
+  this.centerX = x+(Math.floor(w/2)); //the horizontal center of this cell
+  this.centerY = y+(Math.floor(h/2)); //the vertical center of this cell
   this.fillColor = fillColor;
   this.edgeColor = edgeColor;
 
@@ -555,7 +743,7 @@ function Cell(x, y, h, w, indexX, indexY, fillColor, edgeColor)
 
 //this function finds the grid cell at an x y position on the canvas
 function findCellAt(grid, x, y){
-//I think this can be optimized by dividing the mouse's x and y positions by the cell's size. this would give you the inicies of the cell you're on.
+//I think this can be optimized by dividing the mouse's x and y positions by the cell's size. this would give you the indicies of the cell you're on.
 	return grid[Math.floor(x/grid[0][0].w)][Math.floor(y/grid[0][0].h)]; //spoiler alert: it can.
 
 	//old implimentation just in case i ever need it. it served me well.
