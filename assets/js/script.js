@@ -78,7 +78,7 @@ const level2 = [
 ];
 //this is the image that contains all the 16x16 sprites
 var sprites = new Image();
-sprites.src = "assets/images/mySprites2.png";
+sprites.src = "assets/images/mySprites5.png";
 
 //tileObjects contains objects that describe the attributes for each possible tile type.
 //the objects will be added to the cell's object key to represent the sprite/object that should be in that cell.
@@ -87,20 +87,22 @@ sprites.src = "assets/images/mySprites2.png";
 //spritex is the horizontal pixel where the sprite for this object starts (in the sprites img)
 //spritey is the vertical pixel where the sprite for this object starts (in the sprites img)
 //spriteSize is how long all 4 sides of the sprite are (no retangular sprites allowed, only squares.)
-//walkable indicates if the object is walkable (ie: can the player move across it)
+//solid indicates if the tile should collide with things or not.
 //damaging indicates if the object damages the player when touched.
+//changed indicates if this tile has been changed in the last frame or not.
 var tileObjects =  [
-	{"rep":".", "name":"floor", "spritex":64, "spritey" :16, "spriteSize":16, "solid":false, "damaging":false, "visible": false, "changed": true},
-	{"rep":"_", "name":"floor2", "spritex":80, "spritey" :16, "spriteSize":16, "solid":false, "damaging":false, "visible": false, "changed": true},
-	{"rep":"1", "name":"wall", "spritex":0, "spritey" :16, "spriteSize":16, "solid":true, "damaging":false, "visible": false, "changed": true},
-	{"rep":"2", "name":"fount", "spritex":16, "spritey" :16, "spriteSize":16, "solid":true, "damaging":false, "visible": false, "changed": true},
-	{"rep":"3", "name":"wall2", "spritex":32, "spritey" :16, "spriteSize":16, "solid":true, "damaging":false, "visible": false, "changed": true},
-	{"rep":"4", "name":"tree", "spritex":48, "spritey" :16, "spriteSize":16, "solid":true, "damaging":false, "visible": false, "changed": true},
+	{"rep":".", "name":"floor", "spritex":64, "spritey" :137, "spriteSize":16, "solid":false, "damaging":false, "visible": false, "changed": true},
+	{"rep":"_", "name":"floor2", "spritex":80, "spritey" :137, "spriteSize":16, "solid":false, "damaging":false, "visible": false, "changed": true},
+	{"rep":"1", "name":"wall", "spritex":0, "spritey" :137, "spriteSize":16, "solid":true, "damaging":false, "visible": false, "changed": true},
+	{"rep":"2", "name":"fount", "spritex":16, "spritey" :137, "spriteSize":16, "solid":true, "damaging":false, "visible": false, "changed": true},
+	{"rep":"3", "name":"wall2", "spritex":32, "spritey" :137, "spriteSize":16, "solid":true, "damaging":false, "visible": false, "changed": true},
+	{"rep":"4", "name":"tree", "spritex":48, "spritey" :137, "spriteSize":16, "solid":true, "damaging":false, "visible": false, "changed": true},
 ];
 
 //this array holds information about all the interactible entities.
 var entities = [
-	{name: "player", x: 250, y: 250, xVec: 0, yVec: 0, spriteX: 0, spriteY: 0, spriteSize: 16, solid: true}
+	{name: "player", x: 250, y: 250, xVec: 0, yVec: 0, spriteX: 0, spriteY: 0, spriteSize: 16, solid: true, rotation: 0, frame: 0, animation: 0, "cooldowns": {"rolldodge":0, "lightAttack":0}},
+	{name: "ball", x: 400, y: 250, xVec: 0, yVec: 0, spriteX: 0, spriteY: 32, spriteSize: 16, solid: true, rotation: 0, frame: 0, animation: 0}
 ];
 //IDEALLY everything above this line would be in a different file, and would instead be imported and used. but i was having trouble with cross domain issues, so it's here for now...
 //=====================================================================================================================================================
@@ -148,6 +150,7 @@ $("body").mousemove(function(e){
 //------------this captures all the keydown events-------------------
 $("body").keydown(function(e){
 	keysPressed[e.which] = true;
+	//console.log(e.which);
 	keydownHandler(entities, keysPressed);
 });
 
@@ -165,7 +168,8 @@ function mouseMoveHandler(entities, mousex, mousey){
 	//console.log("we move mouse: x="+mousex+", y="+mousey);
 
 	//when the cursor moves, make the player face it.
-	facePlayerToCursor(entities, mousex, mousey);
+	faceEntityToLoc(entities[0], mousex, mousey);
+	//facePlayerToCursor(entities, mousex, mousey);
 
 }//end mouseMoveHandler
 
@@ -174,7 +178,7 @@ function mouseClickHandler(entities, mousex, mousey){
 
 	var foundCell = findCellAt(grid, mousex, mousey);
 	//shoot a ray from the position of the player to the mouse.
-	var hitcoords = castRay(grid, context1, entities[0].x, entities[0].y, mousex, mousey);
+	var hitcoords = castRay(grid, entities[0].x, entities[0].y, mousex, mousey);
 	var hitcell = findCellAt(grid,hitcoords.x, hitcoords.y);
 	console.log(hitcell.object);
 
@@ -182,8 +186,7 @@ function mouseClickHandler(entities, mousex, mousey){
 
 //we run this function every time a key is pressed
 function keydownHandler(entities, keysPressed){
-	//when keys are pressed, recalculate what can be seen.
-	//markObjectsVisibleToEntity_radius(grid, entities[0]);
+
 }//end keydownhandler
 
 //we run this function every time a key is pressed
@@ -192,6 +195,15 @@ function keyupHandler(entities, keysPressed){
 }//end keyuphandler
 
 //==============================================END PLAYER INPUT=============================================================
+
+//this function applies a force to an entity by changing its x and y velocity, direction is based on the x,y location given in paramaters. 
+function applyImpulseToEntity(entity, mag, x,y){
+	console.log("applying impulse");
+	var xslope = (entity.x-x);
+	var yslope = (entity.y-y);
+	entity.xVec += xslope*mag;
+	entity.yVec += yslope*mag;
+}
 
 //this just function takes an entity and changes its x and y location by its x and y velocity
 function moveEntityByVelocity(entity){
@@ -221,9 +233,11 @@ function adjustVelocityOnKeypress(entity, keysPressed, delta, max){
 	//this function adjusts an entity's velocity depending on which key is pressed
 	//max is the maximum speed,
 	//delta is... essentially acceleration.
+	
 	//if the movement keys are pressed...
 	if(keysPressed[65] || keysPressed[68] || keysPressed[83] || keysPressed[87]){
-		facePlayerToCursor(entities, mousePos.x, mousePos.y);
+		//facePlayerToCursor(entities, mousePos.x, mousePos.y);
+		faceEntityToLoc(entities[0], mousePos.x, mousePos.y);
 		if(Math.abs(entity.xVec) <= max){//so long as the xvelocity isnt greater than the allowed max
 			if(keysPressed[65]){//A pressed
 				entity.xVec -= delta;
@@ -241,8 +255,33 @@ function adjustVelocityOnKeypress(entity, keysPressed, delta, max){
 			}
 		}
 	}
+	//roll/dodge
+	if(keysPressed[32] && entity.cooldowns.rolldodge == 0){//spacebar
+		var xdir = 0;
+		var ydir = 0;
+		if(keysPressed[65]){xdir = xdir+4;}
+		if(keysPressed[68]){xdir = xdir-4;}
+		if(keysPressed[83]){ydir = ydir-4;}
+		if(keysPressed[87]){ydir = ydir+4;}
+		
+		applyImpulseToEntity(entity, 3, entity.x+xdir, entity.y+ydir);
+		entity.cooldowns.rolldodge = 6;
+	}
 
 }//end adjustPlayerVelocity
+
+//this function iterates over an entity's cooldown object and ticks down each timer to 0.
+function tickDownCooldowns(entity, speed){
+	$.each(entity.cooldowns, function(p, k){
+		if(k == 0){}//do nothing.
+		else if(k < 0){
+			entity.cooldowns[p] = 0
+		}
+		else if(k > 0){
+			entity.cooldowns[p] = k-speed
+		}
+	});
+}//end tickDownCoolDowns
 
 //this function finds the cells at the 4 corners of a particular entity,
 //then it figures out if those cells are collidable, and if so, changes the entity's velcity by the bounce arg
@@ -516,7 +555,21 @@ function castRay(grid, startx, starty, linex, liney){
 	return ({x:linex,y:liney});
 }
 
-function facePlayerToCursor(entities, mousex, mousey){
+function faceEntityToLoc(entity, x, y){
+	//make an entity face toward an x,y position, by changing its rotation key
+	var rad_90 = 90*0.0174533; //this is the radian value of 90 degrees.
+	var slope = (entity.y - y)/(entity.x - x);
+	//thanks to http://www.gamefromscratch.com/post/2012/11/18/GameDev-math-recipes-Rotating-to-face-a-point.aspx for the tip about atan2
+	//var rads = Math.atan(slope);//using atan causes the sprite to 'flip' weirdly at certain angles. it can never point left?
+	var rads2 = Math.atan2(entity.y - y,entity.x - x)//atan 2 on the other hand gives us the correct radians. this is weird. 
+	//for some reason my math here is about 90 degrees off... this is a shim to fix it...ya know... instead of just fixing my math...
+	entity.rotation = rads2-rad_90; //we save the rotation of the entity in radians.
+	
+	//to convert radians to degrees: 1 radian = 57.2958 degrees
+	//to convert degrees to radians: 1 degree = 0.0174533 radians
+}
+
+/* function facePlayerToCursor(entity, mousex, mousey){
 //make the player's character sprite face the mouse cursor by changing the sprite depending on where the cursor is.
 	var scalar = .3;
 	var dist = eucledianDistance({x:entities[0].x, y:entities[0].y},{x:mousex,y:mousey});
@@ -539,7 +592,7 @@ function facePlayerToCursor(entities, mousex, mousey){
 			else if(mousex > entities[0].x && mousey > entities[0].y){entities[0].spriteX = 48}//up left
 		}
 	}
-}
+} */
 
 //this function finds the manhattan distance (orthagonal travel only, no diagonal) from one CELL to another.
 //we can think of this as the H() portion (heuristic) of our A* algorithm.
@@ -572,35 +625,13 @@ function walkBack(fromCell, startCell){
 	return steps;
 }
 
-//initializes a grid for drawing.
-function girdInit(size, cellsX, cellsY, fillColor, edgeColor)
-{//size is the width and height of the square cells
- //cellsx is the number of horizontal cells in the grid
- //cellsy is the number of vertical cells in the grid
- //fillcolor is the color to fill each cell with (can represent cell states too)
- //edgecolor is the color of the cell's walls.
- console.log("initializing grid...");
-  var gameGrid=[];//initializes the grid array
-
-  for(var i=0; i<cellsX; i++)
-  {
-    //console.log("building col: "+i);
-    gameGrid[i]=[]; //initializes each column in the grid array
-    for(var f=0; f<cellsY; f++)
-    {
-      //console.log("building cell: "+"["+i+","+f+"]");
-      gameGrid[i][f] = new Cell(size*i, size*f, size, size, i, f, fillColor, edgeColor);
-      //console.log(gameGrid[i][f]);
-    }//end x for loop
-  }//end y for loop
-
-  return gameGrid;
-}//end gridInit
-
 function loop(grid, canvas, entities, changed){
 	//-------------------------------------THIS IS WHERE THE GAME LOGIC WOULD GO------------------------------------------
+	//first, tick down all the player's cooldowns, so abilities can be used if possible. .17 is the amount of seconds per frame. 
+	tickDownCooldowns(entities[0], .17);
+	
 	//adjust velocity is called here to make sure we properly accelerate the entity/player EVERY frame. this avoids weird halting behavior when changing direction.
-	var delta = 3; //working value: 1dwsawd
+	var delta = 3; //working value: 1
 	var max = 9;// working value: 3
 	adjustVelocityOnKeypress(entities[0], keysPressed, delta, max);
 
@@ -753,7 +784,7 @@ function drawGrid(canvas, grid, drawWalls)
 }//end drawGrid
 
 function drawChangedObjects(canvas, visibleOnly, changed){
-	console.log("drawing changed objects only...");
+	//console.log("drawing changed objects only...");
 	for(var p = 0; p<changed.length;p++){
 		//if this cell has an object, draw the object in the cell.
 			 if(changed[p].object){
@@ -845,12 +876,46 @@ function drawObjects(grid, canvas, visibleOnly){
 function drawEntities(entities, canvas){
 	for(var e =0; e < entities.length; e++){
 		var halfsize = Math.floor(entities[e].spriteSize/2);
-		canvas.drawImage(sprites, entities[e].spriteX, entities[e].spriteY, entities[e].spriteSize, entities[e].spriteSize, entities[e].x-halfsize, entities[e].y-halfsize, entities[e].spriteSize, entities[e].spriteSize)
+		var cellEntityIsOn = findCellAt(grid, entities[e].x, entities[e].y)
+		if(cellEntityIsOn.object.visible){//dont draw the entity if the cell its on isnt visible anyway.
+			//rotate and translate the canvas context to match the rotation and location of the entity before we draw..
+			canvas.save();//set a translation save point...
+			canvas.translate(entities[e].x,entities[e].y);
+			canvas.rotate(entities[e].rotation);
+			canvas.drawImage(sprites, entities[e].spriteX, entities[e].spriteY, entities[e].spriteSize, entities[e].spriteSize, -1*halfsize, -1*halfsize, entities[e].spriteSize, entities[e].spriteSize)
+			//rotate the canvas context back to what it was after we draw...
+			canvas.restore();//restore the translation save point.
+		}
 	}//end draw entities loop
 }
 
 
 //-------------------------------------------BELOW THIS LINE ARE LOW LEVEL HELPER FUNCTIIONS AND CLASSES-----------------------------------
+//initializes a grid for drawing.
+function girdInit(size, cellsX, cellsY, fillColor, edgeColor)
+{//size is the width and height of the square cells
+ //cellsx is the number of horizontal cells in the grid
+ //cellsy is the number of vertical cells in the grid
+ //fillcolor is the color to fill each cell with (can represent cell states too)
+ //edgecolor is the color of the cell's walls.
+ console.log("initializing grid...");
+  var gameGrid=[];//initializes the grid array
+
+  for(var i=0; i<cellsX; i++)
+  {
+    //console.log("building col: "+i);
+    gameGrid[i]=[]; //initializes each column in the grid array
+    for(var f=0; f<cellsY; f++)
+    {
+      //console.log("building cell: "+"["+i+","+f+"]");
+      gameGrid[i][f] = new Cell(size*i, size*f, size, size, i, f, fillColor, edgeColor);
+      //console.log(gameGrid[i][f]);
+    }//end x for loop
+  }//end y for loop
+
+  return gameGrid;
+}//end gridInit
+
 //this is the cell constructor. it represents and helps set up the info for each cell on our grid.
 function Cell(x, y, h, w, indexX, indexY, fillColor, edgeColor)
 {
@@ -895,7 +960,6 @@ function Cell(x, y, h, w, indexX, indexY, fillColor, edgeColor)
 //this function finds the grid cell at an x y position on the canvas
 function findCellAt(grid, x, y){
 //I think this can be optimized by dividing the mouse's x and y positions by the cell's size. this would give you the indicies of the cell you're on.
-
 	return grid[Math.floor(x/grid[0][0].w)][Math.floor(y/grid[0][0].h)]; //spoiler alert: it can.
 
 	//old implimentation just in case i ever need it. it served me well.
