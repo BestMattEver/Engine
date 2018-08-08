@@ -101,8 +101,12 @@ var tileObjects =  [
 
 //this array holds information about all the interactible entities.
 var entities = [
-	{name: "player", x: 250, y: 250, xVec: 0, yVec: 0, spriteX: 0, spriteY: 0, spriteSize: 16, solid: true, rotation: 0, frame: 0, animation: 0, "cooldowns": {"rolldodge":0, "lightAttack":0}},
-	{name: "ball", x: 400, y: 250, xVec: 0, yVec: 0, spriteX: 0, spriteY: 32, spriteSize: 16, solid: true, rotation: 0, frame: 0, animation: 0}
+	{name: "player", x: 250, y: 250, xVec: 0, yVec: 0, spriteX: 0, spriteY: 0, spriteSize: 16, solid: true, rotation: 0, frame: 0, animation: 0, cooldowns: {"rolldodge":0, "lightAttack":0}},
+	{name: "ball", x: 600, y: 250, xVec: 0, yVec: 0, spriteX: 0, spriteY: 32, spriteSize: 16, solid: true, rotation: 0, frame: 0, animation: 0},
+	{name: "ball2", x: 630, y: 280, xVec: 0, yVec: 0, spriteX: 0, spriteY: 32, spriteSize: 16, solid: true, rotation: 0, frame: 0, animation: 0},
+	{name: "ball3", x: 560, y: 220, xVec: 0, yVec: 0, spriteX: 0, spriteY: 32, spriteSize: 16, solid: true, rotation: 0, frame: 0, animation: 0},
+	{name: "ball4", x: 530, y: 170, xVec: 0, yVec: 0, spriteX: 0, spriteY: 32, spriteSize: 16, solid: true, rotation: 0, frame: 0, animation: 0},
+	{name: "ball5", x: 530, y: 330, xVec: 0, yVec: 0, spriteX: 0, spriteY: 32, spriteSize: 16, solid: true, rotation: 0, frame: 0, animation: 0},
 ];
 //IDEALLY everything above this line would be in a different file, and would instead be imported and used. but i was having trouble with cross domain issues, so it's here for now...
 //=====================================================================================================================================================
@@ -199,10 +203,13 @@ function keyupHandler(entities, keysPressed){
 //this function applies a force to an entity by changing its x and y velocity, direction is based on the x,y location given in paramaters. 
 function applyImpulseToEntity(entity, mag, x,y){
 	console.log("applying impulse");
+	var maxVec = 50;
 	var xslope = (entity.x-x);
 	var yslope = (entity.y-y);
-	entity.xVec += xslope*mag;
-	entity.yVec += yslope*mag;
+	//if the entity is going slower than the (arbitrarily defined) maxVec above, add the slope times the mag to its vec.
+	if(entity.xVec < maxVec){entity.xVec += Math.floor(xslope*mag);}
+	if(entity.yVec < maxVec){entity.yVec += Math.floor(yslope*mag);}
+	
 }
 
 //this just function takes an entity and changes its x and y location by its x and y velocity
@@ -506,21 +513,71 @@ function assignLevelToGrid(grid, level, objs, changed){
 	}//end assignment (j) loop
 };
 
+//this function takes the entities array, and does collision detection, movement, cooldown reduction, and other things to each one.
+//this function should run every frame as it takes care of moment by moment movement and collision for entities. 
+function processEntities(entities, grid, bounce, mag, friction){
+	
+	//thanks to https://www.quora.com/In-JavaScript-how-do-you-create-an-empty-2D-array for helping me figure out how to make an empty 2d array. :(
+	var collisionArray = Array(entities.length).fill(false).map(()=>Array(entities.length).fill(false));
+	
+	//iterate through all the entities
+	for(var i =0; i<entities.length;i++){
+		//console.log("dealing with entity: "+i);
+		//first, tick down each entity's cooldowns, so abilities can be used if possible. .17 is the amount of seconds per frame.	
+		tickDownCooldowns(entities[i], .17);
+		
+		//next, find where/if the entity/player is colliding with env objects and adjust the velocity to keep him from going through stuff
+		findCollisionsThenAdjustVelocity(entities[i], grid, bounce);
+		
+		//here we check if any entities are colliding with this entity. 
+		for(var j = 0; j<entities.length; j++){
+			//if this entity isnt itself, continue checking...
+			if(!i == j){
+				//now make sure we havent already collided these two entities (see below)...
+				//if(collisionArray[j][i] == false){
+					var playerCollide = CheckAABBCollision(entities[i], entities[j]);
+					if(playerCollide){
+						//we use the indicies of the two colliding entities in the entity array as the x/y coordinates
+						//of the collision in the 2d collision array. that way, if we want to check for previous collisions between two entities
+						//we just have to check collisionArray[j][i] for true (NOT [i][j], as we put it into the array. the oppsite),
+						//to see if those two entities already collided this frame. 
+						//collisionArray[i][j] = true;
+						console.log(i+" collided with "+j);
+						
+						//ideally, we'd figure out what kind of collision this is, 
+						//then call a variable in the entity the contains the function to run when it got collided with in a spceific way. 
+						applyImpulseToEntity(entities[j], mag/2, entities[i].x,entities[i].y);//the static entity (ball)
+						applyImpulseToEntity(entities[i], mag, entities[j].x,entities[j].y);//the moving entity (player)
+					}//end collision if
+				//}//end previously collided check
+			}//end self check.
+		}//end inner for loop
+		
+		//this function applies a small reduction to the x and y velocities of an entity to mimic friction. its how entities stop moving.
+		applyFrictionToVelocity(entities[i], friction);
+		
+		//this function (FINALLY) actually changes the x and y location of an entity by its x and y velocity
+		moveEntityByVelocity(entities[i]);
+	}//end outer for loop
+	
+	
+}//end processEntities
 
 //this function checks collision between an entity and a cell, returns a true or false if the entity is colliding with the cell
-function CheckAABBCollision(entity, cell){
+function CheckAABBCollision(entity1, entity2){
 	//first make sure both the cell and the entity should be colliding at all.
 	var collide = false;
-	if(cell.object.solid && entity.solid){
+	if(entity2.solid && entity1.solid){
 		if(//then check their 'Axis Aligned Bounding Box' collision.
-			entity.x < cell.x + cell.object.spriteSize &&
-			entity.x + entity.spriteSize > cell.x &&
-			entity.y < cell.y + cell.object.spriteSize &&
-			entity.y + entity.spriteSize > cell.y
+			entity1.x < entity2.x + entity2.spriteSize &&
+			entity1.x + entity1.spriteSize > entity2.x &&
+			entity1.y < entity2.y + entity2.spriteSize &&
+			entity1.y + entity1.spriteSize > entity2.y
 		  ){
 			//it collides
 			console.log("COLLISION:");
-			console.log(cell);
+			console.log(entity1);
+			console.log(entity2);
 			collide = true;
 		}
 	}
@@ -569,31 +626,6 @@ function faceEntityToLoc(entity, x, y){
 	//to convert degrees to radians: 1 degree = 0.0174533 radians
 }
 
-/* function facePlayerToCursor(entity, mousex, mousey){
-//make the player's character sprite face the mouse cursor by changing the sprite depending on where the cursor is.
-	var scalar = .3;
-	var dist = eucledianDistance({x:entities[0].x, y:entities[0].y},{x:mousex,y:mousey});
-	//console.log("mousex"+mousex);
-	//console.log(dist*scalar);
-	//is the mouse either upish or downish?
-	if(mousex >= entities[0].x-(dist*scalar) && mousex <= entities[0].x+(dist*scalar)){
-		if(mousey < entities[0].y){entities[0].spriteX = 0}//directly up
-		if(mousey > entities[0].y){entities[0].spriteX = 64}//directly down
-	}
-	else{//no? then how about leftish or rightish?
-		if(mousey >= entities[0].y-(dist*scalar) && mousey <= entities[0].y+(dist*scalar)){
-			if(mousex < entities[0].x){entities[0].spriteX = 96}//directly left
-			if(mousex > entities[0].x){entities[0].spriteX = 32}//directly right
-		}
-		else{//still no? then it must be on a diagnoal...
-			if(mousex < entities[0].x && mousey < entities[0].y){entities[0].spriteX = 112}//down right
-			else if(mousex > entities[0].x && mousey < entities[0].y){entities[0].spriteX = 16}//up right
-			else if(mousex < entities[0].x && mousey > entities[0].y){entities[0].spriteX = 80}//down left
-			else if(mousex > entities[0].x && mousey > entities[0].y){entities[0].spriteX = 48}//up left
-		}
-	}
-} */
-
 //this function finds the manhattan distance (orthagonal travel only, no diagonal) from one CELL to another.
 //we can think of this as the H() portion (heuristic) of our A* algorithm.
 function manhattanDistance(fromCell, toCell){
@@ -627,30 +659,23 @@ function walkBack(fromCell, startCell){
 
 function loop(grid, canvas, entities, changed){
 	//-------------------------------------THIS IS WHERE THE GAME LOGIC WOULD GO------------------------------------------
-	//first, tick down all the player's cooldowns, so abilities can be used if possible. .17 is the amount of seconds per frame. 
-	tickDownCooldowns(entities[0], .17);
 	
 	//adjust velocity is called here to make sure we properly accelerate the entity/player EVERY frame. this avoids weird halting behavior when changing direction.
 	var delta = 3; //working value: 1
 	var max = 9;// working value: 3
 	adjustVelocityOnKeypress(entities[0], keysPressed, delta, max);
 
-	//find where/if the entity/player is colliding with env objects and adjust the velocity to keep him from going through stuff
-	var bounce = 3; //working value: 1
-	findCollisionsThenAdjustVelocity(entities[0], grid, bounce);
-
-	//this function applies a small reduction to the x and y velocities of an entity to mimic friction. its how entities stop moving.
-	var friction = 1;//working value: .3
-	applyFrictionToVelocity(entities[0], friction);
-
-	//this function (FINALLY) actually changes the x and y location of an entity by its x and y velocity
-	moveEntityByVelocity(entities[0]);
+	//this function iterates over all the entities and checks their collisions and updates their positions and vectors. it also ticks down their cooldowns
+	var bounce = 3; //how much to bounce an entity off of a solid object. working value: 1 
+	var mag = 1.3;//this is the magnitude of impulses. logically, 1 would be elastic collisions. so this is slightly more flubbery?
+	var friction = 1;//The amount by which all velocities are reduced every frame. working value: .3
+	processEntities(entities, grid, bounce, mag, friction);
 
 	//----------------------------------------------end the game logic----------------------------------------------------
 
 	//----------------------------------------------start render config--------------------------------------------------
 	//define the object that describes what we want to render:
-	var renderThese = {grid: false, objects: true, entities: true, visibleOnly: true, onlyChanged: true};
+	var renderThese = {grid: false, objects: true, entities: true, visibleOnly: false, onlyChanged: true};
 	//warning, setting grid to true REALLY eats up computer power and causes frame rate drop
 
 	if(renderThese.visibleOnly){
@@ -672,6 +697,19 @@ function loop(grid, canvas, entities, changed){
 //third, it draws the mobile objects/entities on the canvas (like the player, enemies and items)
 //fourth, it draws obscuring foreground stuff (clouds? tall buildings? UI?)
 function render(renderThese, grid, canvas, entities, changed){
+	
+	//if we're showing everything, make sure all objects have visible set to true (this affects drawing entities...)
+	if(!renderThese.visibleOnly){
+		for(var i=0; i<grid.length; i++)
+		  {
+			for(var f=0; f<grid[i].length; f++)
+			{
+				if(grid[i][f].object){
+				grid[i][f].object.visible = true;
+				}
+			}
+		  }
+	}
 
 	//if gird is true in the renderThese object, draw the grid.
 	if(renderThese.grid){
@@ -878,8 +916,8 @@ function drawEntities(entities, canvas){
 		var halfsize = Math.floor(entities[e].spriteSize/2);
 		var cellEntityIsOn = findCellAt(grid, entities[e].x, entities[e].y)
 		if(cellEntityIsOn.object.visible){//dont draw the entity if the cell its on isnt visible anyway.
-			//rotate and translate the canvas context to match the rotation and location of the entity before we draw..
 			canvas.save();//set a translation save point...
+			//rotate and translate the canvas context to match the rotation and location of the entity before we draw..
 			canvas.translate(entities[e].x,entities[e].y);
 			canvas.rotate(entities[e].rotation);
 			canvas.drawImage(sprites, entities[e].spriteX, entities[e].spriteY, entities[e].spriteSize, entities[e].spriteSize, -1*halfsize, -1*halfsize, entities[e].spriteSize, entities[e].spriteSize)
