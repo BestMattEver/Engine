@@ -271,8 +271,9 @@ function adjustVelocityOnKeypress(entity, keysPressed, delta, max){
 		if(keysPressed[83]){ydir = ydir-4;}
 		if(keysPressed[87]){ydir = ydir+4;}
 		
+		console.log("we rollin', dey hatin'");
 		applyImpulseToEntity(entity, 3, entity.x+xdir, entity.y+ydir);
-		entity.cooldowns.rolldodge = 6;
+		entity.cooldowns.rolldodge = 10;
 	}
 
 }//end adjustPlayerVelocity
@@ -470,17 +471,25 @@ function setCellsOnFourCornersToChanged(entity, grid, changed){
 		var seCell = findCellAt(grid, entity.x+halfSize, entity.y+halfSize);
 
 		//add the nw cell to the changed array for re-rendering
-		nwCell.changed = true;
-		changed.push(nwCell);
+		if (nwCell) {
+			nwCell.changed = true;
+			changed.push(nwCell);
+		}
 		//add the ne cell to the changed array for re-rendering
-		neCell.changed = true;
-		changed.push(neCell);
+		if (neCell) {
+			neCell.changed = true;
+			changed.push(neCell);
+		}
 		//add the se cell to the changed array for re-rendering
-		seCell.changed = true;
-		changed.push(seCell);
+		if (seCell) {
+			seCell.changed = true;
+			changed.push(seCell);
+		}
 		//add the sw cell to the changed array for re-rendering
-		swCell.changed = true;
-		changed.push(swCell);
+		if (nwCell) {
+			swCell.changed = true;
+			changed.push(swCell);
+		}
 }
 
 //this function takes a 2d level array and an object list to assign the correct object to each cell in the grid based on the 2d level array
@@ -731,7 +740,7 @@ function render(renderThese, grid, canvas, entities, changed){
 
 //draw the entities/mobile objects here
 	if(renderThese.entities){
-		drawEntities(entities, canvas);
+		drawEntities(grid, entities, canvas);
 	}
 
 //draw the UI and obscuring stuff here.
@@ -911,7 +920,7 @@ function drawObjects(grid, canvas, visibleOnly){
 
 }//end drawObjects
 
-function drawEntities(entities, canvas){
+function drawEntities(grid, entities, canvas){
 	for(var e =0; e < entities.length; e++){
 		var halfsize = Math.floor(entities[e].spriteSize/2);
 		var cellEntityIsOn = findCellAt(grid, entities[e].x, entities[e].y)
@@ -998,6 +1007,14 @@ function Cell(x, y, h, w, indexX, indexY, fillColor, edgeColor)
 //this function finds the grid cell at an x y position on the canvas
 function findCellAt(grid, x, y){
 //I think this can be optimized by dividing the mouse's x and y positions by the cell's size. this would give you the indicies of the cell you're on.
+	//these next 6 lines make sure we're asking for a cell within the bounds of the grid.
+	//if not, we change x and y to be NEAR the requested location but still on the grid.
+	if(x < 0) {x = 0;}
+	if(y < 0) {y = 0;}
+	var height = (grid[0].length)*grid[0][0].w-1;
+	var width = (grid.length)*grid[0][0].h-1;
+	if(x > width) {x = width;}
+	if(y > height) {y = height;}
 	return grid[Math.floor(x/grid[0][0].w)][Math.floor(y/grid[0][0].h)]; //spoiler alert: it can.
 
 	//old implimentation just in case i ever need it. it served me well.
