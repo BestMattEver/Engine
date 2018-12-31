@@ -16,8 +16,12 @@ var grid = girdInit(16,85,50,'#0b175b',"#2b43c6");
 // so we dont have to search through all cells to FIND the changed ones.
 var changed =[];
 
+//this is the total elapsed play time in frames.
+//we use it for day/night cycle, and for determining how far along in the narrative we should be. 
+var playTime = 0;  
+
 //our game loop is below.
-//this calls loop every 17 miliseconds (about 60fps).
+//this calls the loop function every 17 miliseconds (about 60fps). (33 ms for 30fps)
 //loop takes care of the game logic, and also re-renders the screen.
 var gameLoopInterval = setInterval(loop, 30, grid, context1, entities, changed);
 
@@ -421,13 +425,11 @@ function processEntities(entities, grid, bounce, mag, friction){
 	
 	//iterate through all the entities
 	for(var i =0; i<entities.length;i++){
-		//first: assign the proper animation to the entity for this frame.
+		//first: figure out if the entity is at rest.
 		if(entities[i].xVec === 0 && entities[i].yVec === 0){
 			entities[i].currentAnim = "idle1";
 		}
-		// else {
-		// 	entities[i].currentAnim = "move"
-		// }
+
 		//check/incriment the animation frame of this entity
 		if(entities[i].animations[entities[i].currentAnim].totalFrames > entities[i].currentFrame) {entities[i].currentFrame++}
 		else { entities[i].currentFrame = 0;}
@@ -451,7 +453,7 @@ function processEntities(entities, grid, bounce, mag, friction){
 						//of the collision in the 2d collision array. that way, if we want to check for previous collisions between two entities
 						//we just have to check collisionArray[j][i] for true (NOT [i][j], as we put it into the array. the oppsite),
 						//to see if those two entities already collided this frame. 
-						//collisionArray[i][j] = true;
+						collisionArray[i][j] = true;
 						console.log(i+" collided with "+j);
 						
 						//ideally, we'd figure out what kind of collision this is, 
@@ -567,9 +569,15 @@ function walkBack(fromCell, startCell){
 	return steps;
 }
 
-function loop(grid, canvas, entities, changed){
+function loop(grid, canvas, entities, changed){ 
 	//-------------------------------------THIS IS WHERE THE GAME LOGIC WOULD GO------------------------------------------
-	
+	if(!loop.hasOwnProperty("playTime")){
+		loop.playTime = 0;
+	}
+	else{
+		loop.playTime++;
+	}
+
 	//adjust velocity is called here to make sure we properly accelerate the entity/player EVERY frame. this avoids weird halting behavior when changing direction.
 	var delta = 3; //working value: 1
 	var max = 9;// working value: 3
@@ -577,15 +585,25 @@ function loop(grid, canvas, entities, changed){
 
 	//this function iterates over all the entities and checks their collisions and updates their positions and vectors. it also ticks down their cooldowns
 	var bounce = 3; //how much to bounce an entity off of a solid object. working value: 1 
-	var mag = 1.3;//this is the magnitude of impulses. logically, 1 would be elastic collisions. so this is slightly more flubbery?
+	var mag = .9;//this is the magnitude of impulses. logically, 1 would be elastic collisions. so this is slightly more flubbery?
 	var friction = 1;//The amount by which all velocities are reduced every frame. working value: .3
 	processEntities(entities, grid, bounce, mag, friction);
+
+	// playTime+=5; //incriment the total play time.
+	// console.log("this the playtime: "+playTime);
 
 	//----------------------------------------------end the game logic----------------------------------------------------
 
 	//----------------------------------------------start render config--------------------------------------------------
 	//define the object that describes what we want to render:
-	var renderThese = {grid: false, objects: true, entities: true, visibleOnly: false, onlyChanged: true};
+	var renderThese = {
+		grid: false,
+		objects: true,
+		entities: true,
+		visibleOnly: false,
+		onlyChanged: true,
+		ui: true,
+	};
 	//warning, setting grid to true REALLY eats up computer power and causes frame rate drop
 
 	if(renderThese.visibleOnly){
@@ -597,7 +615,7 @@ function loop(grid, canvas, entities, changed){
 	}
 
 	//finally, at the end we render all graphics
-	render(renderThese, grid, canvas, entities, changed);
+	render(renderThese, grid, canvas, entities, changed, loop.playTime);
 }//END GAME LOOP
 
 //this function is called at the end of the game loop and collects all the actual drawing functions and runs them in order.
@@ -606,7 +624,7 @@ function loop(grid, canvas, entities, changed){
 //second, it draws the static objects on that grid (like background sprites)
 //third, it draws the mobile objects/entities on the canvas (like the player, enemies and items)
 //fourth, it draws obscuring foreground stuff (clouds? tall buildings? UI?)
-function render(renderThese, grid, canvas, entities, changed){
+function render(renderThese, grid, canvas, entities, changed, playTime){
 	
 	//if we're showing everything, make sure all objects have visible set to true (this affects drawing entities...)
 	if(!renderThese.visibleOnly){
@@ -645,13 +663,32 @@ function render(renderThese, grid, canvas, entities, changed){
 	}
 
 //draw the UI and obscuring stuff here.
-
+	if(renderThese.ui) {
+		drawTime(canvas, playTime);
+		console.log(playTime);
+	}
 
 //we need to reset the changed array for the next frame
 //simply setting changed = [] only affects the refrenced copy, but not the value of the global version.
 //we need to clear the GLOBAL version of this array. stack overflow suggests the following:
 changed = changed.splice(0,changed.length);
 //and it seems to work.
+}
+
+//this takes the total playtime and parses it into an in game time, for day/night cycle and narrative pacing.
+function findInGameTime(playTime) { 
+	//we're going to go with 1 sec real world time = 1 min game time, so:
+	//hold up, this counts frames not ms. so, at 60fps...
+	var elapsedGameSecs = playTime; //this converts 'frames' to time. to slow down or speed up elapsed game time calcs, change this line 
+	var elapsedGameMins = elapsedGameSecs/60;
+	var elapsedGameHours = elapsedGameMins/60;
+	var elapsedGameDays = elapsedGameHours/24;
+
+	var displayDays = Math.floor(elapsedGameDays);
+	var displayHours = Math.floor(elapsedGameHours - (displayDays*24));
+	var displayMins = Math.floor(elapsedGameMins - (displayHours*60));
+
+	return "Day "+displayDays+", "+displayHours+":"+displayMins;
 }
 
 //---------------------------------------BELOW THIS LINE ARE FUNCTIONS FOR ACTUALLY DRAWING THINGS TO THE SCREEN-------------------------
@@ -826,7 +863,7 @@ function drawEntities(grid, entities, canvas){
 		var halfsize = Math.floor(entities[e].spriteSize/2);
 		var cellEntityIsOn = findCellAt(grid, entities[e].x, entities[e].y)
 		if(cellEntityIsOn.object.visible){//dont draw the entity if the cell its on isnt visible anyway.
-			canvas.save();//set a translation save point...
+			canvas.save();//set a translation save point...d
 			//rotate and translate the canvas context to match the rotation and location of the entity before we draw..
 			canvas.translate(entities[e].x,entities[e].y);
 			canvas.rotate(entities[e].rotation);
@@ -842,6 +879,17 @@ function drawEntities(grid, entities, canvas){
 	}//end draw entities loop
 }
 
+//this function draws the in game time in the corner of the canvas. 
+function drawTime(canvas, playTime) {
+	console.log(playTime);
+	var timeString = findInGameTime(playTime);
+
+	canvas.fillStyle = "#fff";
+	//this sets the font to arial and the size to 70% of the average of the height and width.
+	canvas.font = "20px Arial";
+	//this writes the text of the object at the 20% more than cell's x and y locations (ie: toward the center of the cell).
+	canvas.fillText(timeString, 0, 40);
+}
 
 //-------------------------------------------BELOW THIS LINE ARE LOW LEVEL HELPER FUNCTIIONS AND CLASSES-----------------------------------
 //initializes a grid for drawing.
