@@ -579,18 +579,15 @@ function loop(grid, canvas, entities, changed){
 	}
 
 	//adjust velocity is called here to make sure we properly accelerate the entity/player EVERY frame. this avoids weird halting behavior when changing direction.
-	var delta = 3; //working value: 1
-	var max = 9;// working value: 3
+	var delta = 2; //working value: 1
+	var max = 6;// working value: 3
 	adjustVelocityOnKeypress(entities[0], keysPressed, delta, max);
 
 	//this function iterates over all the entities and checks their collisions and updates their positions and vectors. it also ticks down their cooldowns
 	var bounce = 3; //how much to bounce an entity off of a solid object. working value: 1 
 	var mag = .9;//this is the magnitude of impulses. logically, 1 would be elastic collisions. so this is slightly more flubbery?
-	var friction = 1;//The amount by which all velocities are reduced every frame. working value: .3
+	var friction = .6;//The amount by which all velocities are reduced every frame. working value: .3
 	processEntities(entities, grid, bounce, mag, friction);
-
-	// playTime+=5; //incriment the total play time.
-	// console.log("this the playtime: "+playTime);
 
 	//----------------------------------------------end the game logic----------------------------------------------------
 
@@ -665,7 +662,6 @@ function render(renderThese, grid, canvas, entities, changed, playTime){
 //draw the UI and obscuring stuff here.
 	if(renderThese.ui) {
 		drawTime(canvas, playTime);
-		console.log(playTime);
 	}
 
 //we need to reset the changed array for the next frame
@@ -677,7 +673,7 @@ changed = changed.splice(0,changed.length);
 
 //this takes the total playtime and parses it into an in game time, for day/night cycle and narrative pacing.
 function findInGameTime(playTime) { 
-	//we're going to go with 1 sec real world time = 1 min game time, so:
+	//we're going to go with 1 frame real world time = 1 sec game time, so:
 	//hold up, this counts frames not ms. so, at 60fps...
 	var elapsedGameSecs = playTime; //this converts 'frames' to time. to slow down or speed up elapsed game time calcs, change this line 
 	var elapsedGameMins = elapsedGameSecs/60;
@@ -881,7 +877,6 @@ function drawEntities(grid, entities, canvas){
 
 //this function draws the in game time in the corner of the canvas. 
 function drawTime(canvas, playTime) {
-	console.log(playTime);
 	var timeString = findInGameTime(playTime);
 
 	canvas.fillStyle = "#fff";
@@ -889,6 +884,8 @@ function drawTime(canvas, playTime) {
 	canvas.font = "20px Arial";
 	//this writes the text of the object at the 20% more than cell's x and y locations (ie: toward the center of the cell).
 	canvas.fillText(timeString, 0, 40);
+
+	//TODO: ADD CELLS BENEATH THESE TO THE "CHANGED" ARRAY, SO THEY REDRAW.
 }
 
 //-------------------------------------------BELOW THIS LINE ARE LOW LEVEL HELPER FUNCTIIONS AND CLASSES-----------------------------------
