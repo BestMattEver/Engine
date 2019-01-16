@@ -16,12 +16,13 @@ var grid = girdInit(16,85,50,'#0b175b',"#2b43c6");
 // so we dont have to search through all cells to FIND the changed ones.
 var changed =[];
 
+//this offsets the camera. used primarily for camera shake
 var cameraOffset = {
-	active: false,
-	random: true,
-	frames: 0,
-	x: 0,
-	y: 0
+	active: false, //do we even have to bother trying to offset?
+	random: true, //is the offset random within the x y range?
+	frames: 0, // how many frames will the offset last?
+	x: 0, //if random, this is the max x offset, if not, it IS the offset.
+	y: 0 //same as above but for y
 };
 
 //this is the total elapsed play time in frames.
@@ -265,8 +266,8 @@ function findCollisionsThenAdjustVelocity(entity, grid, bounce, cameraOffset){
 		//the next lines cause camera shake.
 		cameraOffset.active = true;
 		cameraOffset.frames = 35;
-		cameraOffset.x = 5;
-		cameraOffset.y = 5;
+		cameraOffset.x = 20;
+		cameraOffset.y = 20;
 	}
 }//end adjustEntityVelocityWithCollisions
 
