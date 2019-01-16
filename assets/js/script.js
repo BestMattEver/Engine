@@ -16,14 +16,22 @@ var grid = girdInit(16,85,50,'#0b175b',"#2b43c6");
 // so we dont have to search through all cells to FIND the changed ones.
 var changed =[];
 
+var cameraOffset = {
+	active: false,
+	random: true,
+	frames: 0,
+	x: 0,
+	y: 0
+};
+
 //this is the total elapsed play time in frames.
-//we use it for day/night cycle, and for determining how far along in the narrative we should be. 
-var playTime = 0;  
+//we use it for day/night cycle, and for determining how far along in the narrative we should be.
+var playTime = 0;
 
 //our game loop is below.
 //this calls the loop function every 17 miliseconds (about 60fps). (33 ms for 30fps)
 //loop takes care of the game logic, and also re-renders the screen.
-var gameLoopInterval = setInterval(loop, 30, grid, context1, entities, changed);
+var gameLoopInterval = setInterval(loop, 30, grid, context1, entities, changed, cameraOffset);
 
 //====================================================PLAYER INPUT HERE=======================================================
 var keysPressed = []; //this is the global array that holds all the keys that are pressed inbetween each frame.
@@ -92,7 +100,7 @@ function keyupHandler(entities, keysPressed){
 
 //==============================================END PLAYER INPUT=============================================================
 
-//this function applies a force to an entity by changing its x and y velocity, direction is based on the x,y location given in paramaters. 
+//this function applies a force to an entity by changing its x and y velocity, direction is based on the x,y location given in paramaters.
 function applyImpulseToEntity(entity, mag, x,y){
 	console.log("applying impulse");
 	var maxVec = 50;
@@ -101,7 +109,7 @@ function applyImpulseToEntity(entity, mag, x,y){
 	//if the entity is going slower than the (arbitrarily defined) maxVec above, add the slope times the mag to its vec.
 	if(entity.xVec < maxVec){entity.xVec += Math.floor(xslope*mag);}
 	if(entity.yVec < maxVec){entity.yVec += Math.floor(yslope*mag);}
-	
+
 }
 
 //this just function takes an entity and changes its x and y location by its x and y velocity
@@ -132,7 +140,7 @@ function adjustVelocityOnKeypress(entity, keysPressed, delta, max){
 	//this function adjusts an entity's velocity depending on which key is pressed
 	//max is the maximum speed,
 	//delta is... essentially acceleration.
-	
+
 	//if the movement keys are pressed...
 	if(keysPressed[65] || keysPressed[68] || keysPressed[83] || keysPressed[87]){
 		//facePlayerToCursor(entities, mousePos.x, mousePos.y);
@@ -163,9 +171,8 @@ function adjustVelocityOnKeypress(entity, keysPressed, delta, max){
 		if(keysPressed[68]){xdir = xdir-4;}
 		if(keysPressed[83]){ydir = ydir-4;}
 		if(keysPressed[87]){ydir = ydir+4;}
-		
-		console.log("we rollin', dey hatin'");
-		applyImpulseToEntity(entity, 1.3, entity.x+xdir, entity.y+ydir);
+
+		applyImpulseToEntity(entity, .7, entity.x+xdir, entity.y+ydir);
 		entity.cooldowns.rolldodge = 10;
 		entity.currentAnim = "rollDodge";
 	}
@@ -188,7 +195,7 @@ function tickDownCooldowns(entity, speed){
 //this function finds the cells at the 4 corners of a particular entity,
 //then it figures out if those cells are collidable, and if so, changes the entity's velcity by the bounce arg
 //such that the entity wont intersect with the cell/object
-function findCollisionsThenAdjustVelocity(entity, grid, bounce){
+function findCollisionsThenAdjustVelocity(entity, grid, bounce, cameraOffset){
 	//find the cells at 4 corners of the player's sprite and check them for collisions.
 	var fourCornersCollisions = findCollisionsOnFourCorners(entity,grid);
 
@@ -253,6 +260,13 @@ function findCollisionsThenAdjustVelocity(entity, grid, bounce){
 			entity.xVec = -1*bounce;
 			entity.yVec = -1*bounce;
 		}
+		console.log("cameraOffset");
+		console.log(cameraOffset);
+		//the next lines cause camera shake.
+		cameraOffset.active = true;
+		cameraOffset.frames = 35;
+		cameraOffset.x = 5;
+		cameraOffset.y = 5;
 	}
 }//end adjustEntityVelocityWithCollisions
 
@@ -417,12 +431,12 @@ function assignLevelToGrid(grid, level, objs, changed){
 };
 
 //this function takes the entities array, and does collision detection, movement, cooldown reduction, and other things to each one.
-//this function should run every frame as it takes care of moment by moment movement and collision for entities. 
-function processEntities(entities, grid, bounce, mag, friction){
-	
+//this function should run every frame as it takes care of moment by moment movement and collision for entities.
+function processEntities(entities, grid, bounce, mag, friction, cameraOffset){
+
 	//thanks to https://www.quora.com/In-JavaScript-how-do-you-create-an-empty-2D-array for helping me figure out how to make an empty 2d array. :(
 	var collisionArray = Array(entities.length).fill(false).map(()=>Array(entities.length).fill(false));
-	
+
 	//iterate through all the entities
 	for(var i =0; i<entities.length;i++){
 		//first: figure out if the entity is at rest.
@@ -433,15 +447,15 @@ function processEntities(entities, grid, bounce, mag, friction){
 		//check/incriment the animation frame of this entity
 		if(entities[i].animations[entities[i].currentAnim].totalFrames > entities[i].currentFrame) {entities[i].currentFrame++}
 		else { entities[i].currentFrame = 0;}
-		
+
 		//console.log("dealing with entity: "+i);
-		//first, tick down each entity's cooldowns, so abilities can be used if possible. .17 is the amount of seconds per frame.	
+		//first, tick down each entity's cooldowns, so abilities can be used if possible. .17 is the amount of seconds per frame.
 		tickDownCooldowns(entities[i], .17);
-		
+
 		//next, find where/if the entity/player is colliding with env objects and adjust the velocity to keep him from going through stuff
-		findCollisionsThenAdjustVelocity(entities[i], grid, bounce);
-		
-		//here we check if any entities are colliding with this entity. 
+		findCollisionsThenAdjustVelocity(entities[i], grid, bounce, cameraOffset);
+
+		//here we check if any entities are colliding with this entity.
 		for(var j = 0; j<entities.length; j++){
 			//if this entity isnt itself, continue checking...
 			if(!i == j){
@@ -452,27 +466,27 @@ function processEntities(entities, grid, bounce, mag, friction){
 						//we use the indicies of the two colliding entities in the entity array as the x/y coordinates
 						//of the collision in the 2d collision array. that way, if we want to check for previous collisions between two entities
 						//we just have to check collisionArray[j][i] for true (NOT [i][j], as we put it into the array. the oppsite),
-						//to see if those two entities already collided this frame. 
+						//to see if those two entities already collided this frame.
 						collisionArray[i][j] = true;
 						console.log(i+" collided with "+j);
-						
-						//ideally, we'd figure out what kind of collision this is, 
-						//then call a variable in the entity the contains the function to run when it got collided with in a spceific way. 
+
+						//ideally, we'd figure out what kind of collision this is,
+						//then call a variable in the entity the contains the function to run when it got collided with in a spceific way.
 						applyImpulseToEntity(entities[j], mag/2, entities[i].x,entities[i].y);//the static entity (ball)
 						applyImpulseToEntity(entities[i], mag, entities[j].x,entities[j].y);//the moving entity (player)
 					}//end collision if
 				//}//end previously collided check
 			}//end self check.
 		}//end inner for loop
-		
+
 		//this function applies a small reduction to the x and y velocities of an entity to mimic friction. its how entities stop moving.
 		applyFrictionToVelocity(entities[i], friction);
-		
+
 		//this function (FINALLY) actually changes the x and y location of an entity by its x and y velocity
 		moveEntityByVelocity(entities[i]);
 	}//end outer for loop
-	
-	
+
+
 }//end processEntities
 
 //this function checks collision between an entity and a cell, returns a true or false if the entity is colliding with the cell
@@ -487,9 +501,6 @@ function CheckAABBCollision(entity1, entity2){
 			entity1.y + entity1.spriteSize > entity2.y
 		  ){
 			//it collides
-			console.log("COLLISION:");
-			console.log(entity1);
-			console.log(entity2);
 			collide = true;
 		}
 	}
@@ -530,10 +541,10 @@ function faceEntityToLoc(entity, x, y){
 	var slope = (entity.y - y)/(entity.x - x);
 	//thanks to http://www.gamefromscratch.com/post/2012/11/18/GameDev-math-recipes-Rotating-to-face-a-point.aspx for the tip about atan2
 	//var rads = Math.atan(slope);//using atan causes the sprite to 'flip' weirdly at certain angles. it can never point left?
-	var rads2 = Math.atan2(entity.y - y,entity.x - x)//atan 2 on the other hand gives us the correct radians. this is weird. 
+	var rads2 = Math.atan2(entity.y - y,entity.x - x)//atan 2 on the other hand gives us the correct radians. this is weird.
 	//for some reason my math here is about 90 degrees off... this is a shim to fix it...ya know... instead of just fixing my math...
 	entity.rotation = rads2-rad_90; //we save the rotation of the entity in radians.
-	
+
 	//to convert radians to degrees: 1 radian = 57.2958 degrees
 	//to convert degrees to radians: 1 degree = 0.0174533 radians
 }
@@ -569,7 +580,7 @@ function walkBack(fromCell, startCell){
 	return steps;
 }
 
-function loop(grid, canvas, entities, changed){ 
+function loop(grid, canvas, entities, changed, cameraOffset){
 	//-------------------------------------THIS IS WHERE THE GAME LOGIC WOULD GO------------------------------------------
 	if(!loop.hasOwnProperty("playTime")){
 		loop.playTime = 0;
@@ -584,10 +595,10 @@ function loop(grid, canvas, entities, changed){
 	adjustVelocityOnKeypress(entities[0], keysPressed, delta, max);
 
 	//this function iterates over all the entities and checks their collisions and updates their positions and vectors. it also ticks down their cooldowns
-	var bounce = 3; //how much to bounce an entity off of a solid object. working value: 1 
+	var bounce = 3; //how much to bounce an entity off of a solid object. working value: 1
 	var mag = .9;//this is the magnitude of impulses. logically, 1 would be elastic collisions. so this is slightly more flubbery?
 	var friction = .6;//The amount by which all velocities are reduced every frame. working value: .3
-	processEntities(entities, grid, bounce, mag, friction);
+	processEntities(entities, grid, bounce, mag, friction, cameraOffset);
 
 	//----------------------------------------------end the game logic----------------------------------------------------
 
@@ -598,7 +609,7 @@ function loop(grid, canvas, entities, changed){
 		objects: true,
 		entities: true,
 		visibleOnly: false,
-		onlyChanged: true,
+		onlyChanged: cameraOffset.active ? false : true, // this needs to be turned off to see the camera offset.
 		ui: true,
 	};
 	//warning, setting grid to true REALLY eats up computer power and causes frame rate drop
@@ -612,7 +623,7 @@ function loop(grid, canvas, entities, changed){
 	}
 
 	//finally, at the end we render all graphics
-	render(renderThese, grid, canvas, entities, changed, loop.playTime);
+	render(renderThese, grid, canvas, entities, changed, loop.playTime, cameraOffset);
 }//END GAME LOOP
 
 //this function is called at the end of the game loop and collects all the actual drawing functions and runs them in order.
@@ -621,8 +632,10 @@ function loop(grid, canvas, entities, changed){
 //second, it draws the static objects on that grid (like background sprites)
 //third, it draws the mobile objects/entities on the canvas (like the player, enemies and items)
 //fourth, it draws obscuring foreground stuff (clouds? tall buildings? UI?)
-function render(renderThese, grid, canvas, entities, changed, playTime){
-	
+function render(renderThese, grid, canvas, entities, changed, playTime, cameraOffset){
+
+	var camOffset = processCameraOffset(cameraOffset);
+
 	//if we're showing everything, make sure all objects have visible set to true (this affects drawing entities...)
 	if(!renderThese.visibleOnly){
 		for(var i=0; i<grid.length; i++)
@@ -636,32 +649,45 @@ function render(renderThese, grid, canvas, entities, changed, playTime){
 		  }
 	}
 
+	//this is the location on screen for the UI (right now just in game time)
+	var timeLocX=0;
+	var timeLocy=40;
+	if(renderThese.ui) {
+	// this adds the cells under the x y location (and all the cells that would be covered by the full time)
+	// to the changed list so they get re-rendered
+		for(var i = 0; i < 15; i++) {
+			changed.push(findCellAt(grid, timeLocX+(i*16), timeLocy)); //16 is the size of the cells. this should be grabbed from the grid itself, in case the cell size changes.
+			changed.push(findCellAt(grid, timeLocX+(i*16), (timeLocy-16))); // for now its fine...
+		}
+	}
+
 	//if gird is true in the renderThese object, draw the grid.
 	if(renderThese.grid){
-		drawGrid(canvas, grid, true);
+		drawGrid(canvas, grid, true, camOffset);
 	}
 	//if objects is true in renderThese object, draw the objects
 	if(renderThese.objects && !renderThese.onlyChanged){
 
-		drawObjects(grid, canvas, renderThese.visibleOnly);// if onlyChanged is false, draw all objects
+		drawObjects(grid, canvas, renderThese.visibleOnl, camOffset);// if onlyChanged is false, draw all objects
 	}
-	else if(renderThese.objects && renderThese.onlyChanged){
+	else if(renderThese.objects && renderThese.onlyChanged, camOffset){
 		//if only rendering the changed AND the visible, clear out the rest with shadow
 		if(renderThese.visibleOnly){
 			canvas.fillStyle = "#555";
 			canvas.fillRect(0, 0, width1, height1);
 		}
-		drawChangedObjects(canvas, renderThese.visibleOnly, changed);//if onlyChanged is true, only draw the objects in the changed array
+		drawChangedObjects(canvas, renderThese.visibleOnly, changed, camOffset);//if onlyChanged is true, only draw the objects in the changed array
 	}
+
+	//draw the UI and obscuring stuff here.
+	if(renderThese.ui) {
+			drawTime(timeLocX, timeLocy, canvas, playTime, changed, grid, camOffset);
+	}
+
 
 //draw the entities/mobile objects here
 	if(renderThese.entities){
-		drawEntities(grid, entities, canvas);
-	}
-
-//draw the UI and obscuring stuff here.
-	if(renderThese.ui) {
-		drawTime(canvas, playTime);
+		drawEntities(grid, entities, canvas, camOffset);
 	}
 
 //we need to reset the changed array for the next frame
@@ -671,11 +697,42 @@ changed = changed.splice(0,changed.length);
 //and it seems to work.
 }
 
+// this takes the global cameraoffset object and figures out the exact offset of the camera for this particular frame
+function processCameraOffset(cameraOffset) {
+	//if the cameraoffset is active, figure out what it is for this frame, and count its frames down.
+	var camOffsetX = 0;
+	var camOffsetY = 0;
+	//if we have a valid offset...
+	if(cameraOffset.active && cameraOffset.frames > 0){
+		console.log("wiggle");
+		//if the offset is random, choose what it should be.
+		if(cameraOffset.random){
+			camOffsetX = Math.floor(Math.random() * Math.floor(cameraOffset.x));
+			camOffsetY = Math.floor(Math.random() * Math.floor(cameraOffset.y));
+		}
+		// if its active but NOT random
+		else {
+			camOffsetX = cameraOffset.x;
+			camOffsetY = cameraOffset.y;
+		}
+		//remove a frame from the camera offset frames timer
+		cameraOffset.frames--;
+	}
+	// if the cam offset is not valid or active,
+	else {
+		camOffsetX = 0;
+		camOffsetY = 0;
+		cameraOffset.active = false;
+	}
+
+	return {x: camOffsetX, y: camOffsetY};
+}
+
 //this takes the total playtime and parses it into an in game time, for day/night cycle and narrative pacing.
-function findInGameTime(playTime) { 
+function findInGameTime(playTime) {
 	//we're going to go with 1 frame real world time = 1 sec game time, so:
 	//hold up, this counts frames not ms. so, at 60fps...
-	var elapsedGameSecs = playTime; //this converts 'frames' to time. to slow down or speed up elapsed game time calcs, change this line 
+	var elapsedGameSecs = playTime; //this converts 'frames' to time. to slow down or speed up elapsed game time calcs, change this line
 	var elapsedGameMins = elapsedGameSecs/60;
 	var elapsedGameHours = elapsedGameMins/60;
 	var elapsedGameDays = elapsedGameHours/24;
@@ -690,7 +747,7 @@ function findInGameTime(playTime) {
 //---------------------------------------BELOW THIS LINE ARE FUNCTIONS FOR ACTUALLY DRAWING THINGS TO THE SCREEN-------------------------
 //this function just draws the grid, wall by wall
 //it takes the canvas you want to draw on, a grid to draw (generated by grid init) and a boolean indicating if you want walls drawn or not.
-function drawGrid(canvas, grid, drawWalls)
+function drawGrid(canvas, grid, drawWalls, camOffset)
 {//grid is a grid array generated by the gridInit function.
 		  //console.log("drawing grid...");
 		  canvas.strokeStyle = '#ffffff';
@@ -702,7 +759,7 @@ function drawGrid(canvas, grid, drawWalls)
 			  //draw a background for this cell.
 			  //console.log("drawing the regular background");
 			  canvas.fillStyle = grid[i][f].fillColor;
-			  canvas.fillRect(grid[i][f].x, grid[i][f].y, grid[i][f].w, grid[i][f].h);
+			  canvas.fillRect(grid[i][f].x+camOffset.x, grid[i][f].y+camOffset.y, grid[i][f].w, grid[i][f].h);
 
 			  var wallSTruth = grid[i][f].wallS;
 			  var wallNTruth = grid[i][f].wallN;
@@ -715,8 +772,8 @@ function drawGrid(canvas, grid, drawWalls)
 			  if(wallNTruth)
 			  { canvas.strokeStyle = grid[i][f].edgeColor;
 				canvas.beginPath();
-				canvas.moveTo(grid[i][f].x, grid[i][f].y);
-				canvas.lineTo((grid[i][f].x+grid[i][f].w),grid[i][f].y);
+				canvas.moveTo(grid[i][f].x+camOffset.x, grid[i][f].y+camOffset.y);
+				canvas.lineTo((grid[i][f].x+grid[i][f].w+camOffset.x),grid[i][f].y+camOffset.y);
 				canvas.stroke();
 				canvas.closePath();
 			  }//end draw north wall
@@ -728,8 +785,8 @@ function drawGrid(canvas, grid, drawWalls)
 				//console.log("wallE: "+grid[i][f].wallE);
 				canvas.strokeStyle = grid[i][f].edgeColor;
 				canvas.beginPath();
-				canvas.moveTo((grid[i][f].x+grid[i][f].w), grid[i][f].y);
-				canvas.lineTo((grid[i][f].x+grid[i][f].w),(grid[i][f].y+grid[i][f].h));
+				canvas.moveTo((grid[i][f].x+grid[i][f].w+camOffset.x), grid[i][f].y+camOffset.y);
+				canvas.lineTo((grid[i][f].x+grid[i][f].w+camOffset.x),(grid[i][f].y+grid[i][f].h+camOffset.y));
 				canvas.stroke();
 				canvas.closePath();
 			  }//end draw east wall
@@ -739,8 +796,8 @@ function drawGrid(canvas, grid, drawWalls)
 			  if(wallSTruth)
 			  { canvas.strokeStyle = grid[i][f].edgeColor;
 				canvas.beginPath();
-				canvas.moveTo((grid[i][f].x+grid[i][f].w),(grid[i][f].y+grid[i][f].h));
-				canvas.lineTo(grid[i][f].x,(grid[i][f].y+grid[i][f].h));
+				canvas.moveTo((grid[i][f].x+grid[i][f].w+camOffset.x),(grid[i][f].y+grid[i][f].h+camOffset.y));
+				canvas.lineTo(grid[i][f].x+camOffset.x,(grid[i][f].y+grid[i][f].h+camOffset.y));
 				canvas.stroke();
 				canvas.closePath();
 			  }//end draw south wall
@@ -752,8 +809,8 @@ function drawGrid(canvas, grid, drawWalls)
 				//console.log("wallW: "+grid[i][f].wallW);
 				canvas.strokeStyle = grid[i][f].edgeColor;
 				canvas.beginPath();
-				canvas.moveTo(grid[i][f].x,(grid[i][f].y+grid[i][f].h));
-				canvas.lineTo(grid[i][f].x,grid[i][f].y);
+				canvas.moveTo(grid[i][f].x+camOffset.x,(grid[i][f].y+grid[i][f].h+camOffset.y));
+				canvas.lineTo(grid[i][f].x+camOffset.x,grid[i][f].y+camOffset.y);
 				canvas.stroke();
 				canvas.closePath();
 			  }//end draw west wall
@@ -764,7 +821,7 @@ function drawGrid(canvas, grid, drawWalls)
 
 }//end drawGrid
 
-function drawChangedObjects(canvas, visibleOnly, changed){
+function drawChangedObjects(canvas, visibleOnly, changed, camOffset){
 	//console.log("drawing changed objects only...");
 	for(var p = 0; p<changed.length;p++){
 		//if this cell has an object, draw the object in the cell.
@@ -774,11 +831,11 @@ function drawChangedObjects(canvas, visibleOnly, changed){
 					 //drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
 					 if(visibleOnly){
 						if(changed[p].object.visible){
-							canvas.drawImage(sprites, changed[p].object.spritex, changed[p].object.spritey, changed[p].object.spriteSize, changed[p].object.spriteSize, changed[p].x, changed[p].y, changed[p].w, changed[p].h);
+							canvas.drawImage(sprites, changed[p].object.spritex, changed[p].object.spritey, changed[p].object.spriteSize, changed[p].object.spriteSize, changed[p].x+camOffset.x, changed[p].y+camOffset.y, changed[p].w, changed[p].h);
 						}
 						else {
 							canvas.fillStyle = "#555";
-							canvas.fillRect(changed[p].x, changed[p].y, changed[p].w, changed[p].h);
+							canvas.fillRect(changed[p].x+camOffset.x, changed[p].y+camOffset.y, changed[p].w, changed[p].h);
 							//draw the image ANYWAY, just draw it at a very low transparency, so its hard to see.
 							//this keeps the game from having huge ugly swaths of solid 'shadow'
 							// canvas.globalAlpha = 0.04;
@@ -788,17 +845,17 @@ function drawChangedObjects(canvas, visibleOnly, changed){
 						}
 					 }//end visible only check
 					 else {
-						 canvas.drawImage(sprites, changed[p].object.spritex, changed[p].object.spritey, changed[p].object.spriteSize, changed[p].object.spriteSize, changed[p].x, changed[p].y, changed[p].w, changed[p].h);
+						 canvas.drawImage(sprites, changed[p].object.spritex, changed[p].object.spritey, changed[p].object.spriteSize, changed[p].object.spriteSize, changed[p].x+camOffset.x, changed[p].y+camOffset.y, changed[p].w, changed[p].h);
 					 }
 				 }
 				 else{//if the object is not a proper game object, just draw the text of whatever is in there
 					console.log('non-game object object found');
 					canvas.fillStyle = "#aaa";
-					canvas.fillRect(changed[p].x,changed[p].y, changed[p].w, changed[p].h);
+					canvas.fillRect(changed[p].x+camOffset.x,changed[p].y+camOffset.y, changed[p].w, changed[p].h);
 					//this sets the font to arial and the size to 70% of the average of the height and width.
 					canvas.font = parseInt((((changed[p].h+changed[p].w)/2)*.7),10)+"px Arial";
 					//this writes the text of the object at the 20% more than cell's x and y locations (ie: toward the center of the cell).
-					canvas.fillText(changed[p].object,(changed[p].x)+(parseInt((changed[p].w*.2),10)),(changed[p].y)-(parseInt((changed[p].h*.2),10)));
+					canvas.fillText(changed[p].object,(changed[p].x+camOffset.x)+(parseInt((changed[p].w*.2),10)),(changed[p].y+camOffset.y)-(parseInt((changed[p].h*.2),10)));
 				 }
 
 				 changed[p].changed = false;
@@ -810,7 +867,7 @@ function drawChangedObjects(canvas, visibleOnly, changed){
 
 }//end drawChangedObjects
 
-function drawObjects(grid, canvas, visibleOnly){
+function drawObjects(grid, canvas, visibleOnly, camOffset){
 
 	 for(var i=0; i<grid.length; i++)
 	{
@@ -822,11 +879,11 @@ function drawObjects(grid, canvas, visibleOnly){
 					 //drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
 					 if(visibleOnly){
 						if(grid[i][f].object.visible){
-							canvas.drawImage(sprites, grid[i][f].object.spritex, grid[i][f].object.spritey, grid[i][f].object.spriteSize, grid[i][f].object.spriteSize, grid[i][f].x, grid[i][f].y, grid[i][f].w, grid[i][f].h);
+							canvas.drawImage(sprites, grid[i][f].object.spritex, grid[i][f].object.spritey, grid[i][f].object.spriteSize, grid[i][f].object.spriteSize, grid[i][f].x+camOffset.x, grid[i][f].y+camOffset.y, grid[i][f].w, grid[i][f].h);
 						}
 						else {
 							canvas.fillStyle = "#555";
-							canvas.fillRect(grid[i][f].x, grid[i][f].y, grid[i][f].w, grid[i][f].h);
+							canvas.fillRect(grid[i][f].x+camOffset.x, grid[i][f].y+camOffset.y, grid[i][f].w, grid[i][f].h);
 							//draw the image ANYWAY, just draw it at a very low transparency, so its hard to see.
 							//this keeps the game from having huge ugly swaths of solid 'shadow'
 							// canvas.globalAlpha = 0.04;
@@ -836,17 +893,17 @@ function drawObjects(grid, canvas, visibleOnly){
 						}
 					 }//end visible only check
 					 else {
-						 canvas.drawImage(sprites, grid[i][f].object.spritex, grid[i][f].object.spritey, grid[i][f].object.spriteSize, grid[i][f].object.spriteSize, grid[i][f].x, grid[i][f].y, grid[i][f].w, grid[i][f].h);
+						 canvas.drawImage(sprites, grid[i][f].object.spritex, grid[i][f].object.spritey, grid[i][f].object.spriteSize, grid[i][f].object.spriteSize, grid[i][f].x+camOffset.x, grid[i][f].y+camOffset.y, grid[i][f].w, grid[i][f].h);
 					 }
 				 }
 				 else{//if the object is not a proper game object, just draw the text of whatever is in there
 					console.log('non-game object object found');
 					canvas.fillStyle = "#aaa";
-					canvas.fillRect(grid[i][f].x, grid[i][f].y, grid[i][f].w, grid[i][f].h);
+					canvas.fillRect(grid[i][f].x+camOffset.x, grid[i][f].y+camOffset.y, grid[i][f].w, grid[i][f].h);
 					//this sets the font to arial and the size to 70% of the average of the height and width.
 					canvas.font = parseInt((((grid[i][f].h+grid[i][f].w)/2)*.7),10)+"px Arial";
 					//this writes the text of the object at the 20% more than cell's x and y locations (ie: toward the center of the cell).
-					canvas.fillText(grid[i][f].object,(grid[i][f].x)+(parseInt((grid[i][f].w*.2),10)),(grid[i][f].y)-(parseInt((grid[i][f].h*.2),10)));
+					canvas.fillText(grid[i][f].object,(grid[i][f].x+camOffset.x)+(parseInt((grid[i][f].w*.2),10)),(grid[i][f].y+camOffset.y)-(parseInt((grid[i][f].h*.2),10)));
 				 }
 			 }//end object draw if
 		}
@@ -854,20 +911,20 @@ function drawObjects(grid, canvas, visibleOnly){
 
 }//end drawObjects
 
-function drawEntities(grid, entities, canvas){
+function drawEntities(grid, entities, canvas, camOffset){
 	for(var e =0; e < entities.length; e++){
 		var halfsize = Math.floor(entities[e].spriteSize/2);
 		var cellEntityIsOn = findCellAt(grid, entities[e].x, entities[e].y)
 		if(cellEntityIsOn.object.visible){//dont draw the entity if the cell its on isnt visible anyway.
 			canvas.save();//set a translation save point...d
 			//rotate and translate the canvas context to match the rotation and location of the entity before we draw..
-			canvas.translate(entities[e].x,entities[e].y);
+			canvas.translate(entities[e].x+camOffset.x,entities[e].y+camOffset.y); //CAMOFFSET NEEDED?
 			canvas.rotate(entities[e].rotation);
 			//find the spritesheet x and y for this entity's animation frame
 			var animX = (entities[e].animations[entities[e].currentAnim].spriteX) + (entities[e].currentFrame * entities[e].spriteSize);
 			var animY = entities[e].animations[entities[e].currentAnim].spriteY;
 			//draw the sprite image for this entity
-			canvas.drawImage(sprites, animX, animY, entities[e].spriteSize, entities[e].spriteSize, -1*halfsize, -1*halfsize, entities[e].spriteSize, entities[e].spriteSize)
+			canvas.drawImage(sprites, animX, animY, entities[e].spriteSize, entities[e].spriteSize, -1*halfsize+camOffset.x, -1*halfsize+camOffset.y, entities[e].spriteSize, entities[e].spriteSize)
 			// canvas.drawImage(sprites, entities[e].spriteX, entities[e].spriteY, entities[e].spriteSize, entities[e].spriteSize, -1*halfsize, -1*halfsize, entities[e].spriteSize, entities[e].spriteSize)
 			//rotate the canvas context back to what it was after we draw...
 			canvas.restore();//restore the translation save point.
@@ -875,17 +932,17 @@ function drawEntities(grid, entities, canvas){
 	}//end draw entities loop
 }
 
-//this function draws the in game time in the corner of the canvas. 
-function drawTime(canvas, playTime) {
+//this function draws the in game time in the corner of the canvas.
+function drawTime(x, y, canvas, playTime, changed, grid) {
 	var timeString = findInGameTime(playTime);
 
 	canvas.fillStyle = "#fff";
 	//this sets the font to arial and the size to 70% of the average of the height and width.
 	canvas.font = "20px Arial";
 	//this writes the text of the object at the 20% more than cell's x and y locations (ie: toward the center of the cell).
-	canvas.fillText(timeString, 0, 40);
 
-	//TODO: ADD CELLS BENEATH THESE TO THE "CHANGED" ARRAY, SO THEY REDRAW.
+
+	canvas.fillText(timeString, x, y);
 }
 
 //-------------------------------------------BELOW THIS LINE ARE LOW LEVEL HELPER FUNCTIIONS AND CLASSES-----------------------------------
