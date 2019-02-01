@@ -273,3 +273,21 @@ function drawTime(x, y, canvas, playTime, changed, grid) {
 
 	canvas.fillText(timeString, x, y);
 }
+
+function drawParticles(particleSystems, canvas, grid) {
+	//this is wildly unpreformant because its 3 nested for loops for a n^3 efficency. not sure how to optimize but def need to...
+	particleSystems.forEach(system => {
+		system.activeEmitters.forEach(emitter => {
+			emitter.particles.forEach(particle => {
+				//if the particle is actually alive,
+				if(particle.alive){
+					//draw the particle, for this emitter, in this system.
+					canvas.beginPath();
+					canvas.arc(particle.x, particle.y, particle.size/2, 0, 2 * Math.PI);
+					canvas.fillStyle = 'rgb('+particle.r+','+particle.g+','+particle.b+','+particle.a+')';
+					canvas.fill();
+				}
+			})//end particles for loop
+		})//end emitter for loop
+	})//end system for loop
+}

@@ -488,6 +488,67 @@ function processEntities(entities, grid, bounce, mag, friction, cameraOffset){
 
 }//end processEntities
 
+// this function is called in the game loop and iterates through all the particle systems, and each active emitter for that
+// particle system, and each particle in each of those systems and updates all of it based on the the rules in the config for
+// each particle system.
+function processParticleSystems(particleSystems, changed, grid){
+	//for each particle system...
+	particleSystems.forEach(system => {
+		if(system.activeEmitters.length > 0) {
+			//each active emitter IN that particle system
+			system.activeEmitters.forEach(emitter => {
+				// TODO: check if life is -1 (meaning always on)
+				//if the emitter isnt old...
+				if(emitter.age <= emitter.life) {
+					emitter.age++;
+					if(emitter.newParticlesThisFrame == 0){
+						//if exactly 0 particles are needed, add the rate of emission to the new particles needed var.
+						emitter.newParticlesThisFrame = emitter.rate;
+					}
+					//check if the emitter requires a whole new particle this frame
+					if(emitter.newParticlesThisFrame > 1) {
+						
+						var newParticlesNeeded = Math.floor(emitter.newParticlesThisFrame);
+						for(var j =0; j)
+						emitter.particles.forEach(particle => {
+							if(!particle.alive){
+								particle.alive = true;
+							}
+						}
+						//make a dead particle alive for each newparticle needed.
+						emitter.newParticlesThisFrame = (newParticlesThisFrame-emitter.newParticlesNeeded);
+					}
+					//otherwise, add the rate to the newparticle number so eventually it will be over 1.
+					else{
+						emitter.newParticlesThisFrame += emitter.rate;
+					}
+				}
+				//if the emitter is too old, slice it out of the active emitters array forever.
+				else{
+
+				}
+				//and for each particle in THAT active emitter...
+				emitter.particles.forEach(particle => {
+					//if the particle isnt dead or too old.
+					if(!particle.alive){
+						//do nothing
+					}
+					else if(particle.age <= particle.maxlife){
+						particle.alive = false;
+					}
+					else {
+						particle.age++;
+						particle.r = particle.r + emitter.rDelta;
+						particle.g = particle.g + emitter.gDelta;
+						particle.b = particle.b + emitter.bDelta;
+						particle.a = particle.a + emitter.aDelta;
+					}
+				})
+			})
+		}
+	})
+}
+
 //this function checks collision between an entity and a cell, returns a true or false if the entity is colliding with the cell
 function CheckAABBCollision(entity1, entity2){
 	//first make sure both the cell and the entity should be colliding at all.
@@ -675,39 +736,46 @@ function findInGameTime(playTime) {
 }
 
 //this function will initialize a particle emitter in the particleSystems object. essentially placing it on the map. 
-function particleEmitterInit(particleSystems, xloc, yloc, system) {
-	var newSystem = {
+function particleEmitterInit(particleSystems, xLoc, yLoc, system) {
+	var newEmitter = {
 
 		life: system.config.systemLife,
 		particleNum: Math.floor(Math.random() * (system.config.particleNumMax - system.config.particleNumMin + 1)) + system.config.particleNumMin,
 		particles: [],
+		age: 0,
 		rate: 0,
-		rDelta:
-		gDelta:
-		bDelta:
-		x1:
-		y1:
-		x2:
-		y2:
+		rDelta: Math.floor((system.config.rEnd - system.config.rStart) / system.config.systemLife), 
+		gDelta:  Math.floor((system.config.gEnd - system.config.gStart) / system.config.systemLife), 
+		bDelta:  Math.floor((system.config.bEnd - system.config.bStart) / system.config.systemLife),
+		aDelta:  Math.floor((system.config.aEnd - system.config.aStart) / system.config.systemLife), 
+		x1: xLoc,
+		y1: yLoc,
+		x2: xLoc + system.config.xSize,
+		y2: yLoc + system.config.ySize,
+		newParticlesThisFrame: 0;
 	};
-	// finding the rate of "particles per frame"
-	newSystem.rate = newSystem.particleNum/system.config.systemLife
+	// finding the emission rate represented as "particles per frame"
+	newEmitter.rate = newEmitter.particleNum/system.config.systemLife
 
-	for(var i = 0; i > newSystem.particleNum; i++){
-		newSystem.particles.push({
+	for(var i = 0; i > newEmitter.particleNum; i++){
+		newEmitter.particles.push({
 			alive: false,
 			age: 0,
-			maxlife: 
-			color:
-			x:
-			y:
-			xVel:
-			yVel:
+			maxlife: Math.floor(Math.random() * (system.config.lifeMax - system.config.lifeMin + 1)) + system.config.lifeMin, 
+			r: system.config.rStart,
+			g: system.config.gStart,
+			g: system.config.bStart,
+			a: system.config.aStart,
+			x: Math.floor(Math.random() * (newEmitter.x1 - newEmitter.x2 + 1)) + newEmitter.x2, 
+			y: Math.floor(Math.random() * (newEmitter.y1 - newEmitter.y2 + 1)) + newEmitter.y2, 
+			xVel: Math.floor(Math.random() * (system.config.yVelMax - system.config.yVelMin + 1)) + system.config.yVelMin, 
+			yVel: Math.floor(Math.random() * (system.config.yVelMax - system.config.yVelMin + 1)) + system.config.yVelMin,
+			size: Math.floor(Math.random() * (system.config.sizeMax - system.config.sizeMin + 1)) + system.config.sizeMin,
 
 		});
 	}
 
-	particleSystems[system].activeEmitters.push(newSystem);
+	particleSystems[system].activeEmitters.push(newEmitter);
 }
 
 //-------------------------------------------BELOW THIS LINE ARE LOW LEVEL HELPER FUNCTIIONS AND CLASSES-----------------------------------

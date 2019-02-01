@@ -9,10 +9,10 @@ var particleSystems = {
             sizeMax: 10, //the maxwas size for a particle in this system
             sizeMin: 5, //the min size for a particle in this system
             sizeDelta: 1, // this is added (or subtracted for neg numbers) to size every frame of particle life to change size.
-            xMax: 5, // the max x starting velocity of particles in this system
-            xMin: 3, // the min x starting velocity of particles in this system 
-            yMax: 5, // the max y starting velocity of particles in this system
-            yMin: 3, // the min y starting velocity of particles in this system
+            xVelMax: 5, // the max x starting velocity of particles in this system
+            xVelMin: 3, // the min x starting velocity of particles in this system 
+            yVelMax: 5, // the max y starting velocity of particles in this system
+            yVelMin: 3, // the min y starting velocity of particles in this system
             xAccel: 0, //the ammount added (or subtracted) to the x velocity of this particle each frame  
             yAccel: 0, //the ammount added (or subtracted) to the y velocity of this particle each frame
             rStart: 200, // these are RGBA starting values
