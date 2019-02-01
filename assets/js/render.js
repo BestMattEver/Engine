@@ -66,6 +66,11 @@ function render(renderThese, grid, canvas, entities, changed, playTime, cameraOf
 		drawEntities(grid, entities, canvas, camOffset);
 	}
 
+//draw the particles
+	if(renderThese.particles){
+		drawParticles(particleSystems, canvas, grid)
+	}
+
 //we need to reset the changed array for the next frame
 //simply setting changed = [] only affects the refrenced copy, but not the value of the global version.
 //we need to clear the GLOBAL version of this array. stack overflow suggests the following:

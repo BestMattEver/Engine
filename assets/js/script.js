@@ -493,7 +493,10 @@ function processEntities(entities, grid, bounce, mag, friction, cameraOffset){
 // each particle system.
 function processParticleSystems(particleSystems, changed, grid){
 	//for each particle system...
-	particleSystems.forEach(system => {
+	var keys = Object.keys(particleSystems);
+	for(var l = 0; l < keys.length; l++){
+		var system = particleSystems[keys[l]];
+	// particleSystems.forEach(system => {
 		if(system.activeEmitters.length > 0) {
 			//each active emitter IN that particle system
 			system.activeEmitters.forEach(emitter => {
@@ -509,10 +512,21 @@ function processParticleSystems(particleSystems, changed, grid){
 					if(emitter.newParticlesThisFrame > 1) {
 						
 						var newParticlesNeeded = Math.floor(emitter.newParticlesThisFrame);
-						for(var j =0; j)
-						emitter.particles.forEach(particle => {
-							if(!particle.alive){
-								particle.alive = true;
+						//for each new particle we need
+						for(var j = 0; j < newParticlesNeeded; j++) {
+							var particlesBirthed = 0;
+							//go through the particles list in the emitter and find the first one that's dead and bring it back to life
+							for(var k =0; k < emitter.particles.length; k++){
+								if(!emitter.particles[k].alive){
+									particle.alive = true;
+									//keep track of how many we've brought back
+									particlesBirthed++;
+									//if we've brought back enough particles already, skip out of the for loop early.
+									if (particlesBirthed == newParticlesNeeded){
+										k=emitter.particles.length;
+									}
+
+								}
 							}
 						}
 						//make a dead particle alive for each newparticle needed.
@@ -535,6 +549,7 @@ function processParticleSystems(particleSystems, changed, grid){
 					}
 					else if(particle.age <= particle.maxlife){
 						particle.alive = false;
+						particle.age = 0;
 					}
 					else {
 						particle.age++;
@@ -542,11 +557,13 @@ function processParticleSystems(particleSystems, changed, grid){
 						particle.g = particle.g + emitter.gDelta;
 						particle.b = particle.b + emitter.bDelta;
 						particle.a = particle.a + emitter.aDelta;
+						particle.x = particle.x+particle.xVel;
+						particle.y = particle.y+particle.yVel;
 					}
 				})
 			})
 		}
-	})
+	}
 }
 
 //this function checks collision between an entity and a cell, returns a true or false if the entity is colliding with the cell
@@ -660,6 +677,9 @@ function loop(grid, canvas, entities, changed, cameraOffset){
 	var friction = .6;//The amount by which all velocities are reduced every frame. working value: .3
 	processEntities(entities, grid, bounce, mag, friction, cameraOffset);
 
+	//this adjusts all the particles in the scene and 
+	processParticleSystems(particleSystems, changed, grid);
+
 	//----------------------------------------------end the game logic----------------------------------------------------
 
 	//----------------------------------------------start render config--------------------------------------------------
@@ -670,6 +690,7 @@ function loop(grid, canvas, entities, changed, cameraOffset){
 		entities: true,
 		visibleOnly: false,
 		onlyChanged: cameraOffset.active ? false : true, // this needs to be turned off to see the camera offset.
+		particles: true,
 		ui: true,
 	};
 	//warning, setting grid to true REALLY eats up computer power and causes frame rate drop
@@ -752,7 +773,7 @@ function particleEmitterInit(particleSystems, xLoc, yLoc, system) {
 		y1: yLoc,
 		x2: xLoc + system.config.xSize,
 		y2: yLoc + system.config.ySize,
-		newParticlesThisFrame: 0;
+		newParticlesThisFrame: 0,
 	};
 	// finding the emission rate represented as "particles per frame"
 	newEmitter.rate = newEmitter.particleNum/system.config.systemLife
