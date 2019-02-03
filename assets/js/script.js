@@ -85,6 +85,7 @@ function mouseClickHandler(entities, mousex, mousey){
 	//shoot a ray from the position of the player to the mouse.
 	var hitcoords = castRay(grid, entities[0].x, entities[0].y, mousex, mousey);
 	var hitcell = findCellAt(grid,hitcoords.x, hitcoords.y);
+	particleEmitterInit(particleSystems, mousex, mousey, "dust");
 	console.log(hitcell.object);
 
 }//end mouseclickhandler
@@ -499,18 +500,18 @@ function processParticleSystems(particleSystems, changed, grid){
 	// particleSystems.forEach(system => {
 		if(system.activeEmitters.length > 0) {
 			//each active emitter IN that particle system
-			system.activeEmitters.forEach(emitter => {
+			for(var u =0; u < system.activeEmitters.length; u++) {
+				var emitter = system.activeEmitters[u];
 				// TODO: check if life is -1 (meaning always on)
 				//if the emitter isnt old...
 				if(emitter.age <= emitter.life) {
 					emitter.age++;
-					if(emitter.newParticlesThisFrame == 0){
+					// if(emitter.newParticlesThisFrame == 0){
 						//if exactly 0 particles are needed, add the rate of emission to the new particles needed var.
-						emitter.newParticlesThisFrame = emitter.rate;
-					}
+						// emitter.newParticlesThisFrame = emitter.rate;
+					// }
 					//check if the emitter requires a whole new particle this frame
 					if(emitter.newParticlesThisFrame > 1) {
-						
 						var newParticlesNeeded = Math.floor(emitter.newParticlesThisFrame);
 						//for each new particle we need
 						for(var j = 0; j < newParticlesNeeded; j++) {
@@ -518,7 +519,7 @@ function processParticleSystems(particleSystems, changed, grid){
 							//go through the particles list in the emitter and find the first one that's dead and bring it back to life
 							for(var k =0; k < emitter.particles.length; k++){
 								if(!emitter.particles[k].alive){
-									particle.alive = true;
+									emitter.particles[k].alive = true;
 									//keep track of how many we've brought back
 									particlesBirthed++;
 									//if we've brought back enough particles already, skip out of the for loop early.
@@ -529,8 +530,7 @@ function processParticleSystems(particleSystems, changed, grid){
 								}
 							}
 						}
-						//make a dead particle alive for each newparticle needed.
-						emitter.newParticlesThisFrame = (newParticlesThisFrame-emitter.newParticlesNeeded);
+						emitter.newParticlesThisFrame = (emitter.newParticlesThisFrame-newParticlesNeeded);
 					}
 					//otherwise, add the rate to the newparticle number so eventually it will be over 1.
 					else{
@@ -539,7 +539,7 @@ function processParticleSystems(particleSystems, changed, grid){
 				}
 				//if the emitter is too old, slice it out of the active emitters array forever.
 				else{
-
+					system.activeEmitters.splice(u, 1);
 				}
 				//and for each particle in THAT active emitter...
 				emitter.particles.forEach(particle => {
@@ -547,7 +547,7 @@ function processParticleSystems(particleSystems, changed, grid){
 					if(!particle.alive){
 						//do nothing
 					}
-					else if(particle.age <= particle.maxlife){
+					else if(particle.age == particle.maxlife){
 						particle.alive = false;
 						particle.age = 0;
 					}
@@ -559,9 +559,21 @@ function processParticleSystems(particleSystems, changed, grid){
 						particle.a = particle.a + emitter.aDelta;
 						particle.x = particle.x+particle.xVel;
 						particle.y = particle.y+particle.yVel;
+
+						changed.push((findCellAt(grid, particle.x, particle.y)));
+						changed.push((findCellAt(grid, particle.x, particle.y+particle.size)));
+						changed.push((findCellAt(grid, particle.x, particle.y-particle.size)));
+						changed.push((findCellAt(grid, particle.x-particle.size, particle.y)));
+						changed.push((findCellAt(grid, particle.x+particle.size, particle.y)));
+						changed.push((findCellAt(grid, particle.x+particle.size, particle.y+particle.size)));
+						changed.push((findCellAt(grid, particle.x-particle.size, particle.y+particle.size)));
+						changed.push((findCellAt(grid, particle.x+particle.size, particle.y-particle.size)));
+						changed.push((findCellAt(grid, particle.x-particle.size, particle.y-particle.size)));
+
+
 					}
 				})
-			})
+			}
 		}
 	}
 }
@@ -677,7 +689,7 @@ function loop(grid, canvas, entities, changed, cameraOffset){
 	var friction = .6;//The amount by which all velocities are reduced every frame. working value: .3
 	processEntities(entities, grid, bounce, mag, friction, cameraOffset);
 
-	//this adjusts all the particles in the scene and 
+	//this adjusts all the particles in the scene and
 	processParticleSystems(particleSystems, changed, grid);
 
 	//----------------------------------------------end the game logic----------------------------------------------------
@@ -716,7 +728,6 @@ function processCameraOffset(cameraOffset) {
 	var camOffsetY = 0;
 	//if we have a valid offset...
 	if(cameraOffset.active && cameraOffset.frames > 0){
-		console.log("wiggle");
 		//if the offset is random, choose what it should be.
 		if(cameraOffset.random){
 			camOffsetX = Math.floor(Math.random() * Math.floor(cameraOffset.x));
@@ -756,46 +767,46 @@ function findInGameTime(playTime) {
 	return "Day "+displayDays+", "+displayHours+":"+displayMins;
 }
 
-//this function will initialize a particle emitter in the particleSystems object. essentially placing it on the map. 
+//this function will initialize a particle emitter in the particleSystems object. essentially placing it on the map.
 function particleEmitterInit(particleSystems, xLoc, yLoc, system) {
 	var newEmitter = {
 
-		life: system.config.systemLife,
-		particleNum: Math.floor(Math.random() * (system.config.particleNumMax - system.config.particleNumMin + 1)) + system.config.particleNumMin,
+		life: particleSystems[system].config.systemLife,
+		particleNum: Math.floor(Math.random() * (particleSystems[system].config.particleNumMax - particleSystems[system].config.particleNumMin + 1)) + particleSystems[system].config.particleNumMin,
 		particles: [],
 		age: 0,
 		rate: 0,
-		rDelta: Math.floor((system.config.rEnd - system.config.rStart) / system.config.systemLife), 
-		gDelta:  Math.floor((system.config.gEnd - system.config.gStart) / system.config.systemLife), 
-		bDelta:  Math.floor((system.config.bEnd - system.config.bStart) / system.config.systemLife),
-		aDelta:  Math.floor((system.config.aEnd - system.config.aStart) / system.config.systemLife), 
+		rDelta: Math.floor((particleSystems[system].config.rEnd - particleSystems[system].config.rStart) / particleSystems[system].config.systemLife),
+		gDelta:  Math.floor((particleSystems[system].config.gEnd - particleSystems[system].config.gStart) / particleSystems[system].config.systemLife),
+		bDelta:  Math.floor((particleSystems[system].config.bEnd - particleSystems[system].config.bStart) / particleSystems[system].config.systemLife),
+		aDelta:  Math.floor((particleSystems[system].config.aEnd - particleSystems[system].config.aStart) / particleSystems[system].config.systemLife),
 		x1: xLoc,
 		y1: yLoc,
-		x2: xLoc + system.config.xSize,
-		y2: yLoc + system.config.ySize,
+		x2: xLoc + particleSystems[system].config.xSize,
+		y2: yLoc + particleSystems[system].config.ySize,
 		newParticlesThisFrame: 0,
 	};
 	// finding the emission rate represented as "particles per frame"
-	newEmitter.rate = newEmitter.particleNum/system.config.systemLife
+	newEmitter.rate = newEmitter.particleNum/particleSystems[system].config.systemLife
 
-	for(var i = 0; i > newEmitter.particleNum; i++){
+	for(var i = 0; i < newEmitter.particleNum; i++){
 		newEmitter.particles.push({
 			alive: false,
 			age: 0,
-			maxlife: Math.floor(Math.random() * (system.config.lifeMax - system.config.lifeMin + 1)) + system.config.lifeMin, 
-			r: system.config.rStart,
-			g: system.config.gStart,
-			g: system.config.bStart,
-			a: system.config.aStart,
-			x: Math.floor(Math.random() * (newEmitter.x1 - newEmitter.x2 + 1)) + newEmitter.x2, 
-			y: Math.floor(Math.random() * (newEmitter.y1 - newEmitter.y2 + 1)) + newEmitter.y2, 
-			xVel: Math.floor(Math.random() * (system.config.yVelMax - system.config.yVelMin + 1)) + system.config.yVelMin, 
-			yVel: Math.floor(Math.random() * (system.config.yVelMax - system.config.yVelMin + 1)) + system.config.yVelMin,
-			size: Math.floor(Math.random() * (system.config.sizeMax - system.config.sizeMin + 1)) + system.config.sizeMin,
+			maxlife: Math.floor(Math.random() * (particleSystems[system].config.lifeMax - particleSystems[system].config.lifeMin + 1)) + particleSystems[system].config.lifeMin,
+			r: particleSystems[system].config.rStart,
+			g: particleSystems[system].config.gStart,
+			g: particleSystems[system].config.bStart,
+			a: particleSystems[system].config.aStart,
+			x: Math.floor(Math.random() * (newEmitter.x1 - newEmitter.x2 + 1)) + newEmitter.x2,
+			y: Math.floor(Math.random() * (newEmitter.y1 - newEmitter.y2 + 1)) + newEmitter.y2,
+			xVel: Math.floor(Math.random() * (particleSystems[system].config.xVelMax - particleSystems[system].config.xVelMin + 1)) + particleSystems[system].config.xVelMin,
+			yVel: Math.floor(Math.random() * (particleSystems[system].config.yVelMax - particleSystems[system].config.yVelMin + 1)) + particleSystems[system].config.yVelMin,
+			size: Math.floor(Math.random() * (particleSystems[system].config.sizeMax - particleSystems[system].config.sizeMin + 1)) + particleSystems[system].config.sizeMin,
 
 		});
 	}
-
+	console.log(newEmitter);
 	particleSystems[system].activeEmitters.push(newEmitter);
 }
 

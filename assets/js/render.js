@@ -8,7 +8,7 @@
 //second, it draws the static objects on that grid (like background sprites)
 //third, it draws the mobile objects/entities on the canvas (like the player, enemies and items)
 //fourth, it draws obscuring foreground stuff (clouds? tall buildings? UI?)
-function render(renderThese, grid, canvas, entities, changed, playTime, cameraOffset){
+function render(renderThese, grid, canvas, entities, changed, playTime, cameraOffset) {
 
 	var camOffset = processCameraOffset(cameraOffset);
 
@@ -280,19 +280,22 @@ function drawTime(x, y, canvas, playTime, changed, grid) {
 }
 
 function drawParticles(particleSystems, canvas, grid) {
+
 	//this is wildly unpreformant because its 3 nested for loops for a n^3 efficency. not sure how to optimize but def need to...
-	particleSystems.forEach(system => {
+	var keys = Object.keys(particleSystems);
+	for(var l = 0; l < keys.length; l++) {
+		var system = particleSystems[keys[l]];
 		system.activeEmitters.forEach(emitter => {
-			emitter.particles.forEach(particle => {
-				//if the particle is actually alive,
-				if(particle.alive){
-					//draw the particle, for this emitter, in this system.
-					canvas.beginPath();
-					canvas.arc(particle.x, particle.y, particle.size/2, 0, 2 * Math.PI);
-					canvas.fillStyle = 'rgb('+particle.r+','+particle.g+','+particle.b+','+particle.a+')';
-					canvas.fill();
-				}
-			})//end particles for loop
+				emitter.particles.forEach(particle => {
+					//if the particle is actually alive,
+					if(particle.alive){
+						//draw the particle, for this emitter, in this system.
+						canvas.beginPath();
+						canvas.arc(particle.x, particle.y, particle.size/2, 0, 2 * Math.PI);
+						canvas.fillStyle = 'rgb('+particle.r+','+particle.g+','+particle.b+','+particle.a+')';
+						canvas.fill();
+					}
+				})//end particles for loop
 		})//end emitter for loop
-	})//end system for loop
+	}//end system for loop
 }
