@@ -548,31 +548,26 @@ function processParticleSystems(particleSystems, changed, grid){
 						//do nothing
 					}
 					else if(particle.age == particle.maxlife){
-						particle.alive = false;
-						particle.age = 0;
+						//keys[l] is the string name of the particle system we're iterating through right now.
+						particleReset(particleSystems, keys[l], emitter, particle)
 					}
 					else {
 						particle.age++;
+						particle.size = particle.size + system.config.sizeDelta;
 						particle.r = particle.r + emitter.rDelta;
 						particle.g = particle.g + emitter.gDelta;
 						particle.b = particle.b + emitter.bDelta;
 						particle.a = particle.a + emitter.aDelta;
 						particle.x = particle.x+particle.xVel;
 						particle.y = particle.y+particle.yVel;
-
-						changed.push((findCellAt(grid, particle.x, particle.y)));
-						changed.push((findCellAt(grid, particle.x, particle.y+particle.size)));
-						changed.push((findCellAt(grid, particle.x, particle.y-particle.size)));
-						changed.push((findCellAt(grid, particle.x-particle.size, particle.y)));
-						changed.push((findCellAt(grid, particle.x+particle.size, particle.y)));
-						changed.push((findCellAt(grid, particle.x+particle.size, particle.y+particle.size)));
-						changed.push((findCellAt(grid, particle.x-particle.size, particle.y+particle.size)));
-						changed.push((findCellAt(grid, particle.x+particle.size, particle.y-particle.size)));
-						changed.push((findCellAt(grid, particle.x-particle.size, particle.y-particle.size)));
-
-
 					}
 				})
+
+				var minpossiblex = emitter.x1+(emitter.life*system.config.xVelMin);
+				var minpossibley = emitter.y1+(emitter.life*system.config.yVelMin);
+				var maxpossiblex = emitter.x2+(emitter.life*system.config.xVelMax);
+				var maxpossibley = emitter.y2+(emitter.life*system.config.yVelMax);
+				addSwathToChanged(grid, changed, minpossiblex, minpossibley, maxpossiblex, maxpossibley);
 			}
 		}
 	}
@@ -770,16 +765,15 @@ function findInGameTime(playTime) {
 //this function will initialize a particle emitter in the particleSystems object. essentially placing it on the map.
 function particleEmitterInit(particleSystems, xLoc, yLoc, system) {
 	var newEmitter = {
-
 		life: particleSystems[system].config.systemLife,
 		particleNum: Math.floor(Math.random() * (particleSystems[system].config.particleNumMax - particleSystems[system].config.particleNumMin + 1)) + particleSystems[system].config.particleNumMin,
 		particles: [],
 		age: 0,
 		rate: 0,
-		rDelta: Math.floor((particleSystems[system].config.rEnd - particleSystems[system].config.rStart) / particleSystems[system].config.systemLife),
-		gDelta:  Math.floor((particleSystems[system].config.gEnd - particleSystems[system].config.gStart) / particleSystems[system].config.systemLife),
-		bDelta:  Math.floor((particleSystems[system].config.bEnd - particleSystems[system].config.bStart) / particleSystems[system].config.systemLife),
-		aDelta:  Math.floor((particleSystems[system].config.aEnd - particleSystems[system].config.aStart) / particleSystems[system].config.systemLife),
+		rDelta: ((particleSystems[system].config.rEnd - particleSystems[system].config.rStart) / particleSystems[system].config.lifeMax),
+		gDelta: ((particleSystems[system].config.gEnd - particleSystems[system].config.gStart) / particleSystems[system].config.lifeMax),
+		bDelta: ((particleSystems[system].config.bEnd - particleSystems[system].config.bStart) / particleSystems[system].config.lifeMax),
+		aDelta: ((particleSystems[system].config.aEnd - particleSystems[system].config.aStart) / particleSystems[system].config.lifeMax),
 		x1: xLoc,
 		y1: yLoc,
 		x2: xLoc + particleSystems[system].config.xSize,
@@ -796,7 +790,7 @@ function particleEmitterInit(particleSystems, xLoc, yLoc, system) {
 			maxlife: Math.floor(Math.random() * (particleSystems[system].config.lifeMax - particleSystems[system].config.lifeMin + 1)) + particleSystems[system].config.lifeMin,
 			r: particleSystems[system].config.rStart,
 			g: particleSystems[system].config.gStart,
-			g: particleSystems[system].config.bStart,
+			b: particleSystems[system].config.bStart,
 			a: particleSystems[system].config.aStart,
 			x: Math.floor(Math.random() * (newEmitter.x1 - newEmitter.x2 + 1)) + newEmitter.x2,
 			y: Math.floor(Math.random() * (newEmitter.y1 - newEmitter.y2 + 1)) + newEmitter.y2,
@@ -808,7 +802,25 @@ function particleEmitterInit(particleSystems, xLoc, yLoc, system) {
 	}
 	console.log(newEmitter);
 	particleSystems[system].activeEmitters.push(newEmitter);
-}
+}//end particleEmitterInit
+
+//this function takes an EXISTING particle and resets it to factory conditions.
+//ie: resets it to be in compliance with the initial state of a particle for the passed in system.
+function particleReset(particleSystems, system, emitter, particle){
+		particle.alive = false;
+		particle.age= 0;
+		particle.maxlife= Math.floor(Math.random() * (particleSystems[system].config.lifeMax - particleSystems[system].config.lifeMin + 1)) + particleSystems[system].config.lifeMin;
+		particle.r = particleSystems[system].config.rStart;
+		particle.g = particleSystems[system].config.gStart;
+		particle.b = particleSystems[system].config.bStart;
+		particle.a= particleSystems[system].config.aStart;
+		particle.x= Math.floor(Math.random() * (emitter.x1 - emitter.x2 + 1)) + emitter.x2;
+		particle.y= Math.floor(Math.random() * (emitter.y1 - emitter.y2 + 1)) + emitter.y2;
+		particle.xVel= Math.floor(Math.random() * (particleSystems[system].config.xVelMax - particleSystems[system].config.xVelMin + 1)) + particleSystems[system].config.xVelMin;
+		particle.yVel= Math.floor(Math.random() * (particleSystems[system].config.yVelMax - particleSystems[system].config.yVelMin + 1)) + particleSystems[system].config.yVelMin;
+		particle.size= Math.floor(Math.random() * (particleSystems[system].config.sizeMax - particleSystems[system].config.sizeMin + 1)) + particleSystems[system].config.sizeMin;
+		return particle;
+}//end particleReset
 
 //-------------------------------------------BELOW THIS LINE ARE LOW LEVEL HELPER FUNCTIIONS AND CLASSES-----------------------------------
 //initializes a grid for drawing.
@@ -876,6 +888,16 @@ function Cell(x, y, h, w, indexX, indexY, fillColor, edgeColor)
   this.object = 0;
 
 }//end constructor
+
+//this function takes two x,y coordinates and adds all cells within the rectangle created by those coordinates
+//to the changed array, so that the renderer rerenders those cells. used primarily with the particle system.
+function addSwathToChanged(grid, changed, x1, y1, x2, y2) {
+	for(var i = x1; i <= x2; i=i+grid[0][0].w){
+		for(var k = y1; k <= y2; k=k+grid[0][0].h) {
+			changed.push(findCellAt(grid, i, k));
+		}
+	}
+}//end addswathtochanged
 
 //this function finds the grid cell at an x y position on the canvas
 function findCellAt(grid, x, y){
